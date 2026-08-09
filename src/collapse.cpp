@@ -39,7 +39,6 @@
 //   phase   'group'     (also: uniform, stagger, randomQuantized)
 //   pairing 'gradient'  (also: chained, pairs)
 static const uint32_t LOOP_MS     = 6000;   // one full blind cycle
-static const int      LOOP_REPEAT = 4;      // cycles before a new composition
 
 static const int   MARGIN        = 1;       // empty border, in cells
 static const float INK_RATIO     = 0.32f;   // stop placing once this much is inked
@@ -668,18 +667,16 @@ void setup() {
     while (true) delay(1000);
   }
 
-  generate(esp_random());
+  generate(newSeed());
 }
 
 void loop() {
   const uint32_t frameStart = millis();
-  const uint32_t elapsed    = frameStart - compositionAt;
-  if (elapsed >= LOOP_MS * LOOP_REPEAT) {
-    generate(esp_random());
-    return;
-  }
 
-  const float t = (float)(elapsed % LOOP_MS) / (float)LOOP_MS;
+  // The pack cycles forever; only RESET builds a new one. compositionAt is the
+  // phase origin rather than a deadline, so entering this sketch always starts
+  // the blinds from the top of a cycle.
+  const float t = (float)((frameStart - compositionAt) % LOOP_MS) / (float)LOOP_MS;
 
   const uint32_t t0 = wallMicros();
   for (int i = 0; i < nRects; i++) if (!blinds[i].isStatic) drawBlind(blinds[i], t);

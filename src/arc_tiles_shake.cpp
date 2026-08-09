@@ -24,7 +24,6 @@
 static const int      RES_X   = 3;
 static const int      RES_Y   = 6;
 static const int      NCELLS  = RES_X * RES_Y;
-static const uint32_t HOLD_MS = 8000;   // only used if the IMU is missing
 
 // Inset the grid by this many pixels on every side. The margin needs no
 // drawing of its own — fillScreen already lays down bg, and the grid is
@@ -360,8 +359,6 @@ static void generate(uint32_t seed) {
 }
 
 // ---------------------------------------------------------------------------
-static bool imuOk = false;
-
 void setup() {
   Serial.begin(115200);
   delay(300);
@@ -371,9 +368,12 @@ void setup() {
     while (true) delay(1000);
   }
 
-  imuOk = imuBegin();
+  // Worth saying out loud rather than logging a bare failure: with no IMU the
+  // shake below can never fire, and RESET becomes the only way to a new
+  // composition.
+  if (!imuBegin()) Serial.println("no IMU - RESET is the only way to a new composition");
 
-  generate(esp_random());
+  generate(newSeed());
 }
 
 void loop() {
@@ -382,14 +382,7 @@ void loop() {
 
   if (now - lastFire >= SHAKE_COOLDOWN_MS && shakeDetected(SHAKE_G)) {
     lastFire = now;
-    generate(esp_random());
-  }
-
-  // With no IMU there's no way to ask for a new composition, so keep the old
-  // timer as a safety net rather than freezing on a single frame forever.
-  if (!imuOk && now - lastFire >= HOLD_MS) {
-    lastFire = now;
-    generate(esp_random());
+    generate(newSeed());
   }
 
   delay(5);

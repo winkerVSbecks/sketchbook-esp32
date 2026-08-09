@@ -12,7 +12,8 @@
 //
 // Desktop: click the window.
 //
-//   imuBegin()          probe and configure; false means fall back to a timer
+//   imuBegin()          probe and configure; false means no shake gesture at
+//                       all, so RESET is the only way to a new composition
 //   shakeDetected(g)    true on a peak above `g` total acceleration
 // ============================================================================
 #pragma once
@@ -79,7 +80,6 @@ static bool imuBegin() {
     if (Wire.endTransmission() == 0) { Serial.printf("0x%02X ", a); found++; }
   }
   Serial.println(found ? "" : "(bus empty)");
-  Serial.println("falling back to the timer");
   return false;
 }
 
@@ -104,8 +104,8 @@ static bool shakeDetected(float shakeG) {
 static bool imuBegin() { return true; }
 
 // Mouse-down edge, so a held button doesn't machine-gun new seeds. Headless
-// builds have no window to click, so they never fire — the sketch's timer
-// fallback is what advances a capture run.
+// builds have no window to click, so they never fire — a capture is one
+// composition, the one setup() drew.
 static bool shakeDetected(float) {
 #if defined(SKETCH_HEADLESS)
   return false;

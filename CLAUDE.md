@@ -8,17 +8,35 @@ A generative-art sketchbook for the **Waveshare ESP32-S3-LCD-1.47B** (ESP32-S3R8
 
 One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`:
 
-| Sketch | Env prefix | Advances on |
+| Sketch | Env prefix | Motion |
 |---|---|---|
-| `src/main.cpp` | `native` / `esp32` / `arc_shot` | an 8s timer |
-| `src/arc_tiles_shake.cpp` | `shake_*` | shaking the board (QMI8658 IMU); click the window on SDL |
-| `src/collapse.cpp` | `collapse_*` | animated, 6s loop; new pack every 4 cycles |
-| `src/trochoidal_wave.cpp` | `wave_*` | animated, 4s loop; new composition every 4 cycles |
+| `src/main.cpp` | `native` / `esp32` / `arc_shot` | still |
+| `src/arc_tiles_shake.cpp` | `shake_*` | still, but shaking the board (QMI8658 IMU) redraws it; click the window on SDL |
+| `src/collapse.cpp` | `collapse_*` | animated, 6s loop |
+| `src/trochoidal_wave.cpp` | `wave_*` | animated, 4s loop |
 | `src/terminal_charts.cpp` | `charts_*` | animated, 8s scroll loop |
-| `src/skeleton_line.cpp` | `skeleton_*` | animated, 8s loop; one composition per reset |
+| `src/skeleton_line.cpp` | `skeleton_*` | animated, 8s loop |
 | `src/switcher.cpp` | `switcher_*` | all of the above except `main.cpp`, in one binary; BOOT cycles |
 
 Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env trio plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
+
+## The two buttons
+
+**No sketch regenerates on a timer.** A composition holds until you ask for another, and the two buttons ask different questions:
+
+| Button | Does |
+|---|---|
+| BOOT (GPIO0) | next sketch, wrapping — switcher only. A click in the bottom strip of the SDL window stands in |
+| RESET | reboot, redraw the *same* sketch from a new seed |
+
+RESET has no code behind it and can't have any: it's wired to EN, so software never sees the press. Everything it does falls out of the reboot — every `setup()` calls `generate(newSeed())`. **A new sketch gets this for free and must not add a timer to "help".**
+
+Two things make that work, both in `platform.h`:
+
+- **`newSeed()` mixes `esp_random()` with a boot counter in NVS.** `esp_random()` alone isn't enough: with the RF subsystem off, the bootloader's entropy source is switched off again before the app starts, so one boot's sequence isn't promised to differ from the last one's — and a RESET that returns the composition you pressed the button to escape is the one failure this feature has. The counter is read once per boot, not per call, or the switcher would write flash on every press.
+- **`persistGet`/`persistPut` keep the switcher's roster position in NVS**, so RESET resumes where you were instead of dropping back to sketch 1 — otherwise the buttons fight, since you couldn't reseed without losing your place. It has to be flash: RESET pulls EN, which is a power-on reset and takes RTC memory with it. The stored index is clamped on read, because it outlives the binary that wrote it.
+
+Off-device both persist calls are no-ops. **SDL has no RESET stand-in** — relaunch the binary, which is why its `main()` seeds `rand()` from the clock. The headless `main()` deliberately does the opposite and seeds from `argv`, so captures reproduce.
 
 ## The switcher
 
@@ -33,7 +51,9 @@ Two consequences worth knowing:
 
 That 128KB is the number to defend. `skeleton_line.cpp` arrived with a 55KB coverage plane, which as a static would have taken the roster to 183KB — leaving the 110KB sprite hunting for a contiguous block in the ~119KB still free at `panelBegin()` time, which is the kind of margin that fails at boot rather than degrading. It uses `psramAlloc()` instead and costs the switcher 5.5KB. **A new sketch with a buffer this size should do the same** rather than spend internal SRAM, but only if it walks that buffer in spans — PSRAM goes through the data cache, so scan-shaped access is nearly free and random access is not.
 
-`panelBegin()` is idempotent for this reason — a switch re-runs the incoming sketch's `setup()`, and re-initialising the SPI bus and churning a 110KB allocation each time would fragment the heap.
+`panelBegin()` is idempotent for this reason — a switch re-runs the incoming sketch's `setup()`, and re-initialising the SPI bus and churning a 110KB allocation each time would fragment the heap. That re-run is also what makes every entry a fresh composition: `setup()` calls `generate(newSeed())`.
+
+Sketches keep their function-local statics across a switch (playhead cursors, frame counters). That's harmless now that nothing regenerates on a timer — a stale cursor is only a phase offset into a cyclic animation, with no deadline left for it to trip. It was not harmless before: `terminal_charts.cpp` compared `millis() / LOOP_MS` against a counter that started at 0, and since the switcher's clock keeps running while other sketches draw, re-entry always read as overdue and threw away the composition `setup()` had just built.
 
 ## Commands
 
@@ -60,7 +80,7 @@ If the board won't flash: hold BOOT, tap RESET, release BOOT.
 
 | Header | What it carries |
 |---|---|
-| `platform.h` | shims, both `LGFX` panel classes, `lcd`, `cv`, `W`/`H`, `panelBegin()`, `present()`, `wallMicros()`, `psramAlloc()`, and all three entry points |
+| `platform.h` | shims, both `LGFX` panel classes, `lcd`, `cv`, `W`/`H`, `panelBegin()`, `present()`, `wallMicros()`, `psramAlloc()`, `newSeed()`, `persistGet`/`persistPut`, `buttonBegin`/`buttonPressed`, and all three entry points |
 | `color.h` | sRGB/oklab/oklch, `wcagContrast`, `deltaEok`, `to565`, `blend565`, `to565Dither`, `shadeL`, `paletteLightest` |
 | `prng.h` | mulberry32 behind the canvas-sketch-util names (`rngRange`, `rngRangeFloor`, `rngChance`, `rngPick`, `rngShuffle`) |
 | `noise.h` | 4D simplex noise — the field behind `Random.noise4D`. Call `noiseSeed()` straight after `rngSeed()`; it burns 255 draws, exactly as `Random.setSeed` does |
@@ -85,7 +105,17 @@ A full-frame push costs ~22ms at 40MHz SPI, capping you near 45fps before you've
 
 `platform.h` builds a third target per sketch. Under `-DSKETCH_HEADLESS` it allocates the sprite, skips `lcd.init()` entirely, and turns `present()` into a PNG write — stored-deflate, hand-rolled, no zlib and no image tooling. An SDL window can only be judged by a human; PNGs on disk can be read back and inspected, which is how a port gets checked.
 
-In that build `millis()` is a **virtual clock**: it advances only via `delay()` plus a fixed 16ms per `loop()`. That makes captures deterministic and stops a run burning real seconds on an 8s `HOLD_MS` — but it means `millis()` cannot time a frame. Use `wallMicros()` for that.
+**Count the PNGs, don't just check the exit code.** `_frameNo` counts frames rendered, not files written, so it has to advance even when a write fails or a run would never hit its target. `present()` prints `FAILED to write ...` on that path — but the run still ends with status 0, so an unwritable output directory looks exactly like success from the shell.
+
+In that build `millis()` is a **virtual clock**: it advances only via `delay()` plus a fixed 16ms per `loop()`. That's what keeps a capture off the real clock — but it means `millis()` cannot time a frame. Use `wallMicros()` for that.
+
+**A capture is only reproducible if nothing feeds real time back into `delay()`.** Some sketches pace themselves with `delay(FRAME_MS - spent)` where `spent` comes from `wallMicros()` — so how fast the *host* rendered decides how far the virtual clock moves, and the playhead lands somewhere new on every run. Measured over five runs of each unchanged binary:
+
+| Deterministic — a PNG diff is a real regression test | Not — a PNG diff is noise |
+|---|---|
+| `arc_shot`, `shake_shot`, `collapse_shot`, `charts_shot` | `wave_shot`, `skeleton_shot`, `switcher_shot` |
+
+`switcher_shot` is in the right-hand column only because it hosts wave and skeleton; its own logic is deterministic. **Check which column you're in before believing a diff** — single runs of the right-hand three agree often enough to look like proof and then disagree on the next run. For those, assert on something timing-independent instead: comparing `======== [n/5]` entry lines against `Seed:` lines is what actually shows no sketch regenerates behind your back. `collapse.cpp` shows the fix for the underlying problem — a constant `delay(LOOP_MS / SKETCH_FRAMES - 16)` on the headless path.
 
 ## Hardware facts that are easy to get wrong
 

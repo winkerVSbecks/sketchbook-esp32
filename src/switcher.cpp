@@ -1,8 +1,17 @@
 // ============================================================================
 // switcher.cpp — every sketch in one binary, BOOT cycles between them
 // ============================================================================
-// Press BOOT (GPIO0) to advance to the next sketch; it wraps around. On SDL,
-// click the bottom strip of the window.
+// The two buttons do two different jobs, and neither is on a timer:
+//
+//   BOOT (GPIO0)   advance to the next sketch; wraps around. On SDL, click the
+//                  bottom strip of the window.
+//   RESET          reboot, and come back to the *same* sketch with a new seed.
+//
+// RESET only manages that second half because the roster position is written to
+// flash on every BOOT press and read back in setup(). It has to be flash:
+// RESET pulls EN, which is a power-on reset, and takes RTC memory with it. The
+// alternative — coming back on sketch 1 every time — would mean the two buttons
+// fought each other, since you could not reseed without also losing your place.
 //
 // The obstacle this file works around: every sketch in src/ is a complete
 // translation unit with its own setup(), loop(), and a pile of file-scope
@@ -12,10 +21,9 @@
 // compiles precisely one of them. Hosting several at once means solving those
 // collisions.
 //
-// src/main.cpp is deliberately not in the roster: it is arc tiles on a timer,
-// and arc_tiles_shake.cpp is the same composition with a shake trigger and an
-// 8s timer of its own as the no-IMU fallback. It still builds standalone from
-// the native/esp32/arc_shot envs.
+// src/main.cpp is deliberately not in the roster: it draws the same arc tiles
+// as arc_tiles_shake.cpp, which is here and adds the shake trigger. It still
+// builds standalone from the native/esp32/arc_shot envs.
 //
 // The fix is to give each sketch its own namespace, without editing any of
 // them:
@@ -39,7 +47,7 @@
 // The sketches are unmodified and their own envs still build them standalone.
 //
 //   pio run -e switcher_native -t exec    # SDL; click low in the window
-//   pio run -e switcher_esp32 -t upload   # board; press BOOT
+//   pio run -e switcher_esp32 -t upload   # board; press BOOT, then RESET
 // ============================================================================
 #define SKETCH_TITLE "switcher"
 
@@ -112,17 +120,25 @@ static int active = 0;
 
 // Hand control to a sketch by running its setup(), exactly as a standalone
 // build would. Its panelBegin() call is idempotent, so the shared sprite
-// survives the switch and only the screen is cleared.
+// survives the switch and only the screen is cleared. setup() also draws from
+// newSeed(), so every entry is a composition you have not seen.
 //
 // Sketches keep function-local statics across a switch (playhead cursors,
-// frame counters). That is harmless: each one compares against millis(), so a
-// stale cursor reads as "this composition is long overdue" and the sketch
-// regenerates on its first frame back — which is what a fresh entry should do
-// anyway.
+// frame counters). That is harmless: a stale cursor is only a phase offset into
+// a cyclic animation, and none of the sketches carries a deadline any more for
+// it to trip.
 static void enter(int i) {
   active = i;
   Serial.printf("\n======== [%d/%d] %s ========\n", i + 1, N_SKETCHES, SKETCHES[i].name);
   SKETCHES[i].setup();
+}
+
+// Advance the roster and write the new position down, so a RESET resumes here
+// rather than at the top. Flash, once per press — see persistPut in platform.h.
+static void advance() {
+  const int next = (active + 1) % N_SKETCHES;
+  persistPut("sketch", (uint32_t)next);
+  enter(next);
 }
 
 void setup() {
@@ -131,10 +147,13 @@ void setup() {
 
   buttonBegin();
 
-  Serial.printf("\nswitcher: %d sketches, press BOOT to cycle\n", N_SKETCHES);
+  Serial.printf("\nswitcher: %d sketches, BOOT cycles, RESET reseeds\n", N_SKETCHES);
   for (int i = 0; i < N_SKETCHES; i++) Serial.printf("  %d. %s\n", i + 1, SKETCHES[i].name);
 
-  enter(0);
+  // Clamped, not trusted: the stored index outlives the binary that wrote it,
+  // so a build with a shorter roster would otherwise resume off the end.
+  const int saved = (int)persistGet("sketch", 0);
+  enter(saved >= 0 && saved < N_SKETCHES ? saved : 0);
 }
 
 void loop() {
@@ -153,7 +172,7 @@ void loop() {
   if (++iters >= SHOT_ITERS_MAX || _frameNo - framesAtEntry >= SHOT_FRAMES_EACH) {
     iters         = 0;
     framesAtEntry = _frameNo;
-    enter((active + 1) % N_SKETCHES);
+    advance();
     return;
   }
 #endif
@@ -161,7 +180,7 @@ void loop() {
   // Polled once per frame rather than on a timer. Every sketch yields within
   // 5-40ms, so the longest a press can go unnoticed is one frame.
   if (buttonPressed()) {
-    enter((active + 1) % N_SKETCHES);
+    advance();
     return;
   }
   SKETCHES[active].loop();

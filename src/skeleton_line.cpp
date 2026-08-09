@@ -698,7 +698,7 @@ void setup() {
     hullSin[s] = sinf(th);
   }
 
-  generate(esp_random());
+  generate(newSeed());
 }
 
 void loop() {

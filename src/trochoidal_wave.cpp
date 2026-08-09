@@ -54,10 +54,6 @@
 static const uint32_t LOOP_MS  = 4000;                  // ssam duration
 static const uint32_t FRAME_MS = 1000 / 24;             // ssam playFps
 
-// The JS runs one composition forever; on a panel that gets dull. Regenerate
-// on a whole number of loops so the wave never jumps mid-cycle.
-static const int CYCLES_PER_COMPOSITION = 4;
-
 // Downscale factor for the dither pass.
 //
 // The JS uses 0.125 on a 1080px canvas: a dither cell is 8 canvas pixels, or
@@ -360,7 +356,7 @@ void setup() {
     while (true) delay(1000);
   }
 
-  generate(esp_random());
+  generate(newSeed());
 }
 
 void loop() {
@@ -368,12 +364,11 @@ void loop() {
   static bool     started = false;
   static uint32_t frames  = 0;
 
+  // Like the JS, one composition runs forever — RESET is what replaces it.
+  // compositionStart is latched on the first frame and is only a phase origin,
+  // so the playhead below is a pure loop with no deadline in it.
   const uint32_t now = millis();
   if (!started) { compositionStart = now; started = true; }
-  if (now - compositionStart >= LOOP_MS * (uint32_t)CYCLES_PER_COMPOSITION) {
-    compositionStart = now;
-    generate(esp_random());
-  }
 
   const float playhead = (float)((now - compositionStart) % LOOP_MS) / (float)LOOP_MS;
   drawFrame(playhead * 2.0f * (float)M_PI);

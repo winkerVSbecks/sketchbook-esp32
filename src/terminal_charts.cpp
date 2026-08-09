@@ -81,7 +81,7 @@ static const int N        = 24;
 static const int BUFFER_N = 64;
 
 // The 8s loop the JS `duration` sets. One full pass of the buffer per loop, so
-// the scroll is seamless; the composition is rebuilt on the wrap.
+// the scroll is seamless and the wrap is invisible.
 static const uint32_t LOOP_MS = 8000;
 
 #if defined(SKETCH_HEADLESS)
@@ -697,21 +697,18 @@ void setup() {
     while (true) delay(1000);
   }
 
-  generate(esp_random());
+  generate(newSeed());
 }
 
 void loop() {
-  static uint32_t curLoop = 0;
   static uint32_t accBuild = 0, accBlit = 0, accPush = 0;
   static int      nFrames  = 0;
 
-  const uint32_t now = millis();
-  const uint32_t idx = now / LOOP_MS;
-  if (idx != curLoop) {                    // the JS holds one composition for
-    curLoop = idx;                         // ever; on a panel, 8s is plenty
-    generate(esp_random());
-  }
-  const int offset = (int)(((now % LOOP_MS) * (uint32_t)BUFFER_N) / LOOP_MS);
+  // Like the JS, one composition holds for ever — RESET is what replaces it.
+  // The scroll is a seamless wrap of a cyclic buffer, so the absolute phase
+  // here needs no origin: every offset looks like every other.
+  const uint32_t now    = millis();
+  const int      offset = (int)(((now % LOOP_MS) * (uint32_t)BUFFER_N) / LOOP_MS);
 
   // wallMicros(), not millis(): the headless build's millis() is a virtual
   // clock that only moves when the sketch calls delay(), which is what makes

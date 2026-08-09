@@ -47,6 +47,7 @@ static const int H = 320;
 
   #include <Arduino.h>
   #include <esp_heap_caps.h>
+  #include <Preferences.h>
 
 #else
 
@@ -54,6 +55,7 @@ static const int H = 320;
   #include <cstdio>
   #include <cstdlib>
   #include <cstring>
+  #include <ctime>
 
   static uint32_t esp_random() {
     return ((uint32_t)rand() << 16) ^ (uint32_t)rand();
@@ -256,19 +258,27 @@ static bool writeFramePng(const char *path) {
 #endif  // headless
 
 // ---------------------------------------------------------------------------
-// BOOT button
+// The two buttons
 // ---------------------------------------------------------------------------
-// GPIO0 idles high through its pull-up and shorts to ground when pressed, so a
-// press is a falling edge. buttonPressed() reports one event per press, not one
-// per poll, so holding the button does not machine-gun.
+// The board's controls divide cleanly: BOOT changes *which* sketch is running,
+// RESET changes *what that sketch drew*. No sketch regenerates on a timer, so
+// between presses a composition holds for as long as you leave it.
 //
-// RESET is the board's other button and is deliberately absent here: it is
-// wired to the chip's EN line, so software never sees it — it reboots the S3.
+// BOOT is GPIO0, which idles high through its pull-up and shorts to ground when
+// pressed — so a press is a falling edge. buttonPressed() reports one event per
+// press, not one per poll, so holding the button does not machine-gun.
+//
+// RESET has no entry point here and cannot have one: it is wired to the chip's
+// EN line, so software never sees the press — the S3 simply reboots and every
+// sketch's setup() draws a fresh composition from newSeed(). That reboot is
+// also why the switcher's place in the roster lives in flash (persistGet
+// below); RTC memory is powered from the same domain EN drops.
 //
 // On desktop there is no BOOT pin, so a click in the bottom strip of the window
 // stands in. That strip is not the whole window on purpose: imu.h already reads
 // a click *anywhere* as a shake, and a binary hosting both needs the two
-// gestures to stay tellable apart.
+// gestures to stay tellable apart. There is no RESET stand-in — relaunch the
+// binary, which reseeds from the clock (see main() at the foot of this file).
 static const int      PIN_BOOT           = 0;
 static const uint32_t BUTTON_DEBOUNCE_MS = 200;
 static const int      BUTTON_SDL_STRIP_H = 48;
@@ -301,6 +311,80 @@ static inline bool buttonPressed() {
   if (now - last < BUTTON_DEBOUNCE_MS) return false;
   last = now;
   return true;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// State that survives a reboot
+// ---------------------------------------------------------------------------
+// A few small integers kept in NVS. Flash is the only thing that survives the
+// RESET button: it pulls EN, which is a power-on reset, and RTC memory — the
+// cheap answer to "remember one number across a reboot" — is powered from the
+// domain that drops with it.
+//
+// Cost is one small write per call, so only write on a button press, never per
+// frame. NVS wear-levels, and a press is a human-rate event.
+//
+// Off-device both are no-ops and a read returns its default, so an SDL run
+// always starts from a clean slate — which is what keeps headless captures
+// reproducible.
+static inline uint32_t persistGet(const char *key, uint32_t fallback) {
+#if defined(ARDUINO)
+  Preferences p;
+  if (!p.begin("sketchbook", true)) return fallback;   // read-only; absent namespace fails
+  const uint32_t v = p.getUInt(key, fallback);
+  p.end();
+  return v;
+#else
+  (void)key;
+  return fallback;
+#endif
+}
+
+static inline void persistPut(const char *key, uint32_t value) {
+#if defined(ARDUINO)
+  Preferences p;
+  if (!p.begin("sketchbook", false)) return;
+  p.putUInt(key, value);
+  p.end();
+#else
+  (void)key; (void)value;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Seeds
+// ---------------------------------------------------------------------------
+// A fresh seed for generate(). Every sketch calls this from setup(), so this is
+// the whole of what the RESET button does: reboot, reseed, redraw.
+//
+// The one guarantee that matters is that a RESET does not hand back the
+// composition you just pressed the button to be rid of — and esp_random() alone
+// does not make it. With the RF subsystem off, the bootloader's entropy source
+// is switched off again before the app starts, so the sequence one boot sees is
+// not promised to differ from the last one's. A counter in flash is promised to
+// differ, so the two are mixed: esp_random() supplies the variation *within* a
+// boot, the counter supplies it *across* boots, and neither has to be trusted
+// alone.
+//
+// Off-device this is plain esp_random() — rand() under the shim — which the
+// headless main() seeds from argv so that a capture reproduces exactly.
+static inline uint32_t newSeed() {
+#if defined(ARDUINO)
+  // Read once per boot, not once per call: switcher.cpp re-runs a sketch's
+  // setup() on every BOOT press, and re-reading here would turn each press into
+  // a second flash write for no added entropy.
+  static uint32_t salt   = 0;
+  static bool     loaded = false;
+  if (!loaded) {
+    loaded = true;
+    salt   = persistGet("boots", 0) + 1;
+    persistPut("boots", salt);
+    salt *= 0x9E3779B9u;              // spread consecutive boot counts apart
+  }
+  return esp_random() ^ salt;
+#else
+  return esp_random();
 #endif
 }
 
@@ -364,7 +448,14 @@ static inline void present() {
 #if defined(SKETCH_HEADLESS)
   char path[512];
   snprintf(path, sizeof(path), "%s/frame_%03d.png", _shotDir, _frameNo);
+  // Say so when the write fails. _frameNo counts frames *rendered*, so it has
+  // to advance either way or the run would never reach its target and would
+  // spin to the iteration cap instead — but that also means a run whose output
+  // directory is unwritable otherwise ends silently, exit 0, with nothing on
+  // disk and nothing on stderr. A capture that reports success while producing
+  // no evidence is worse than one that crashes.
   if (writeFramePng(path)) fprintf(stderr, "wrote %s\n", path);
+  else                     fprintf(stderr, "FAILED to write %s\n", path);
   _frameNo++;
 #else
   cv.pushSprite(0, 0);
@@ -408,6 +499,12 @@ int user_func(bool *running) {
 }
 
 int main(int, char **) {
+  // Desktop has no RESET button, so relaunching the binary is how you ask for a
+  // new composition — which only works if the run is seeded. Nothing else on
+  // this path calls srand(), so without this rand() would start from its
+  // default 1 and every run would open on the same frame. The headless main()
+  // above deliberately does the opposite and seeds from argv.
+  srand((unsigned)time(nullptr));
   return lgfx::Panel_sdl::main(user_func);
 }
 

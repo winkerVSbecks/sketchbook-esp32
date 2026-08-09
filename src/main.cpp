@@ -1,5 +1,5 @@
 // ============================================================================
-// arc-tile grid — new composition every 8s
+// arc-tile grid — one composition, held until RESET
 // ============================================================================
 //   pio run -e native   -t exec      SDL window
 //   pio run -e esp32    -t upload    the board
@@ -23,7 +23,6 @@
 static const int      RES_X   = 3;
 static const int      RES_Y   = 6;
 static const int      NCELLS  = RES_X * RES_Y;
-static const uint32_t HOLD_MS = 8000;
 
 // How many foreground colours a composition may use. 1 = a two-tone piece:
 // one background, one ink. Raise it (up to 16) to go back to multi-colour —
@@ -296,14 +295,11 @@ void setup() {
     while (true) delay(1000);
   }
 
-  generate(esp_random());
+  generate(newSeed());
 }
 
+// The composition is static and setup() has already drawn it, so there is
+// nothing to do per frame. RESET is what asks for the next one.
 void loop() {
-  static uint32_t last = 0;
-  if (millis() - last >= HOLD_MS) {
-    last = millis();
-    generate(esp_random());
-  }
   delay(20);
 }
