@@ -109,6 +109,11 @@ static const int      RES_Y   = 6;
 static const int      NCELLS  = RES_X * RES_Y;
 static const uint32_t HOLD_MS = 8000;   // only used if the IMU is missing
 
+// Inset the grid by this many pixels on every side. The margin needs no
+// drawing of its own — fillScreen already lays down bg, and the grid is
+// simply laid out inside the smaller rect.
+static const int      MARGIN  = 8;
+
 // Shake gesture. At rest the accelerometer reads ~1.0g (gravity); a deliberate
 // shake spikes well past 2g. Lower SHAKE_G for a hair trigger, raise it if the
 // piece regenerates when you just pick the board up. The cooldown stops one
@@ -440,9 +445,12 @@ static void drawCell(const GridCell &c, int x0, int x1, int y0, int y1) {
 static void render() {
   cv.fillScreen(to565(bg));
 
+  const int innerW = W - 2 * MARGIN;
+  const int innerH = H - 2 * MARGIN;
+
   int colEdge[RES_X + 1], rowEdge[RES_Y + 1];
-  for (int i = 0; i <= RES_X; i++) colEdge[i] = (int)lroundf(i * (float)W / RES_X);
-  for (int j = 0; j <= RES_Y; j++) rowEdge[j] = (int)lroundf(j * (float)H / RES_Y);
+  for (int i = 0; i <= RES_X; i++) colEdge[i] = MARGIN + (int)lroundf(i * (float)innerW / RES_X);
+  for (int j = 0; j <= RES_Y; j++) rowEdge[j] = MARGIN + (int)lroundf(j * (float)innerH / RES_Y);
 
   for (int i = 0; i < NCELLS; i++) {
     const GridCell &c = grid[i];

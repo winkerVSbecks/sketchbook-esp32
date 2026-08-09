@@ -42,7 +42,13 @@ fi
 if echo "$MAP" | cut -f1 | grep -qx "$TARGET"; then
   ENV="$TARGET"
 else
-  MATCHES=$(echo "$MAP" | awk -F'\t' -v t="${TARGET##*/}" '$2 == "espressif32" && $3 == t { print $1 }')
+  # Match on the source basename, with or without a .cpp/.ino/.c extension.
+  MATCHES=$(echo "$MAP" | awk -F'\t' -v t="${TARGET##*/}" '
+    $2 == "espressif32" {
+      s = $3;  sub(/\.(cpp|ino|c)$/, "", s)
+      tt = t;  sub(/\.(cpp|ino|c)$/, "", tt)
+      if (s == tt) print $1
+    }')
   COUNT=$(echo "$MATCHES" | grep -c . || true)
   if [ "$COUNT" -eq 0 ]; then
     echo "error: no espressif32 environment builds '$TARGET'" >&2
