@@ -16,7 +16,8 @@ One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`:
 | `src/trochoidal_wave.cpp` | `wave_*` | animated, 4s loop |
 | `src/terminal_charts.cpp` | `charts_*` | animated, 8s scroll loop |
 | `src/skeleton_line.cpp` | `skeleton_*` | animated, 8s loop |
-| `src/switcher.cpp` | `switcher_*` | all of the above except `main.cpp`, in one binary; BOOT cycles |
+| `src/jali_truchet.cpp` | `jali_*` | still, but tilt slides the lattice (parallax); shake or BOOT redraws it. SDL: drag = tilt, bottom-strip click = redraw |
+| `src/switcher.cpp` | `switcher_*` | all of the above except `main.cpp` and `jali_truchet.cpp`, in one binary; BOOT cycles |
 
 Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env trio plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
 
@@ -26,7 +27,7 @@ Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs 
 
 | Button | Does |
 |---|---|
-| BOOT (GPIO0) | next sketch, wrapping — switcher only. A click in the bottom strip of the SDL window stands in |
+| BOOT (GPIO0) | next sketch, wrapping — switcher only. A click in the bottom strip of the SDL window stands in. Standalone `jali_truchet` repurposes it as redraw, which it can only do because it isn't in the roster |
 | RESET | reboot, redraw the *same* sketch from a new seed |
 
 RESET has no code behind it and can't have any: it's wired to EN, so software never sees the press. Everything it does falls out of the reboot — every `setup()` calls `generate(newSeed())`. **A new sketch gets this for free and must not add a timer to "help".**
@@ -89,7 +90,7 @@ If the board won't flash: hold BOOT, tap RESET, release BOOT.
 | `harmony.h` | the `tintsShades` half of `pro-color-harmonies`, output in Oklch |
 | `dither.h` | Atkinson error diffusion + nearest-neighbour expand |
 | `termfont.h` | 5x8 bitmap font: box-drawing, block, and randomart glyphs |
-| `imu.h` | QMI8658 shake detection, with a window-click stand-in on SDL |
+| `imu.h` | QMI8658 shake detection and `imuTilt()` (the gravity vector, for parallax), with click / drag stand-ins on SDL and a deterministic drift fallback |
 
 Set `SKETCH_TITLE` (and optionally `SKETCH_FRAMES`) *before* including `platform.h`.
 

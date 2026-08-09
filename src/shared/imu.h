@@ -15,10 +15,24 @@
 //   imuBegin()          probe and configure; false means no shake gesture at
 //                       all, so RESET is the only way to a new composition
 //   shakeDetected(g)    true on a peak above `g` total acceleration
+//   imuTilt(gx, gy)     the gravity vector's screen-plane components, in g
 // ============================================================================
 #pragma once
 
 #include "platform.h"
+
+// Tilt fallback when there is no live accelerometer (probe failed, or a
+// headless run): a slow deterministic circle, so tilt-driven pieces drift
+// rather than freeze — and headless captures actually show the motion, spread
+// across the virtual clock.
+static const uint32_t TILT_DRIFT_MS = 8000;
+static const float    TILT_DRIFT_G  = 0.35f;
+
+static inline void _tiltDrift(float &gx, float &gy) {
+  const float ph = (float)(millis() % TILT_DRIFT_MS) * (6.2831853f / (float)TILT_DRIFT_MS);
+  gx = TILT_DRIFT_G * cosf(ph);
+  gy = TILT_DRIFT_G * sinf(ph);
+}
 
 #if defined(ARDUINO)
 
@@ -99,6 +113,26 @@ static bool shakeDetected(float shakeG) {
   return true;
 }
 
+// gx > 0 when the panel's right edge dips, gy > 0 when its bottom (USB) edge
+// dips; both ~0 lying face-up, gy ~1 standing upright. The mapping below takes
+// the QMI8658's X/Y axes straight — it has not been sighted on hardware yet,
+// so if parallax tracks the wrong axis or runs backwards, flip these signs
+// here, not in a sketch.
+static const float TILT_SIGN_X = 1.0f;
+static const float TILT_SIGN_Y = 1.0f;
+
+static void imuTilt(float &gx, float &gy) {
+  if (imuAddr) {
+    uint8_t raw[6];
+    if (imuRead(QMI_AX_L, raw, 6)) {
+      gx = TILT_SIGN_X * (float)(int16_t)(raw[0] | (raw[1] << 8)) / ACCEL_LSB_PER_G;
+      gy = TILT_SIGN_Y * (float)(int16_t)(raw[2] | (raw[3] << 8)) / ACCEL_LSB_PER_G;
+      return;
+    }
+  }
+  _tiltDrift(gx, gy);
+}
+
 #else
 
 static bool imuBegin() { return true; }
@@ -116,6 +150,29 @@ static bool shakeDetected(float) {
   const bool fired = down && !wasDown;
   wasDown = down;
   return fired;
+#endif
+}
+
+// Drag stands in for tilt: hold the mouse and pull away from the window
+// centre; released, the tilt eases back to level. Headless has no window, so
+// it drifts on the virtual clock instead.
+static const float TILT_SDL_G = 0.6f;
+
+static void imuTilt(float &gx, float &gy) {
+#if defined(SKETCH_HEADLESS)
+  _tiltDrift(gx, gy);
+#else
+  static float hx = 0.0f, hy = 0.0f;
+  int32_t tx, ty;
+  if (lcd.getTouch(&tx, &ty)) {
+    hx = ((float)tx - W * 0.5f) / (W * 0.5f) * TILT_SDL_G;
+    hy = ((float)ty - H * 0.5f) / (H * 0.5f) * TILT_SDL_G;
+  } else {
+    hx *= 0.90f;
+    hy *= 0.90f;
+  }
+  gx = hx;
+  gy = hy;
 #endif
 }
 
