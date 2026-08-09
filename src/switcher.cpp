@@ -6,8 +6,8 @@
 //
 // The obstacle this file works around: every sketch in src/ is a complete
 // translation unit with its own setup(), loop(), and a pile of file-scope
-// statics — and they collide hard. All four hosted here define generate();
-// three define LOOP_MS; two define rects[], at different types. That is
+// statics — and they collide hard. All five hosted here define generate();
+// four define LOOP_MS; two define rects[], at different types. That is
 // exactly why platformio.ini gives each sketch a build_src_filter that
 // compiles precisely one of them. Hosting several at once means solving those
 // collisions.
@@ -27,9 +27,14 @@
 // from inside its namespace the second include is a no-op and the sketch binds
 // to the global definitions from step 1. Everything platform.h declares is
 // `static`, so step 1 also means there is exactly one `lcd`, one `cv`, and one
-// 110KB framebuffer for all four sketches to share — rather than four of each,
+// 110KB framebuffer for all five sketches to share — rather than five of each,
 // which would not fit in SRAM. Only the sketches' own symbols land inside the
 // namespaces, which is precisely the set that was colliding.
+//
+// Sharing the framebuffer is not the whole RAM story: skeleton_line.cpp's 55KB
+// coverage plane would, as a static, leave too little contiguous internal SRAM
+// for that framebuffer to allocate. It takes psramAlloc() instead — see the
+// note above `ab` in that file.
 //
 // The sketches are unmodified and their own envs still build them standalone.
 //
@@ -48,6 +53,8 @@
 #include "shared/dither.h"
 #include "shared/termfont.h"
 #include "shared/imu.h"
+#include "shared/noise.h"
+#include "shared/subtractive.h"
 #include <string.h>
 
 // Step 2 — the sketches. SKETCH_TITLE/SKETCH_FRAMES are #undef'd ahead of each
@@ -77,6 +84,12 @@ namespace sk_charts {
 #include "terminal_charts.cpp"
 }
 
+#undef SKETCH_TITLE
+#undef SKETCH_FRAMES
+namespace sk_skeleton {
+#include "skeleton_line.cpp"
+}
+
 // ---------------------------------------------------------------------------
 // The roster
 // ---------------------------------------------------------------------------
@@ -91,6 +104,7 @@ static const Sketch SKETCHES[] = {
   { "collapse",          sk_collapse::setup, sk_collapse::loop },
   { "trochoidal wave",   sk_wave::setup,     sk_wave::loop     },
   { "terminal charts",   sk_charts::setup,   sk_charts::loop   },
+  { "skeleton line",     sk_skeleton::setup, sk_skeleton::loop },
 };
 static const int N_SKETCHES = (int)(sizeof(SKETCHES) / sizeof(SKETCHES[0]));
 
@@ -126,7 +140,7 @@ void setup() {
 void loop() {
 #if defined(SKETCH_HEADLESS)
   // A capture run has no button, so it would otherwise only ever show sketch 0
-  // — and the thing worth checking about this file is that all four still
+  // — and the thing worth checking about this file is that all five still
   // render correctly from inside their namespaces.
   //
   // Advance on frames OR iterations, not frames alone: arc_tiles_shake draws

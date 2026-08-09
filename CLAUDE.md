@@ -15,20 +15,23 @@ One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`:
 | `src/collapse.cpp` | `collapse_*` | animated, 6s loop; new pack every 4 cycles |
 | `src/trochoidal_wave.cpp` | `wave_*` | animated, 4s loop; new composition every 4 cycles |
 | `src/terminal_charts.cpp` | `charts_*` | animated, 8s scroll loop |
-| `src/switcher.cpp` | `switcher_*` | all four of the above in one binary; BOOT cycles |
+| `src/skeleton_line.cpp` | `skeleton_*` | animated, 8s loop; one composition per reset |
+| `src/switcher.cpp` | `switcher_*` | all of the above except `main.cpp`, in one binary; BOOT cycles |
 
 Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env trio plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
 
 ## The switcher
 
-`src/switcher.cpp` hosts four sketches in one binary and cycles with BOOT (GPIO0), or a click in the bottom strip of the SDL window. The strip is deliberately not the whole window: `imu.h` already reads a click *anywhere* as a shake, and a binary carrying both needs the gestures distinguishable.
+`src/switcher.cpp` hosts five sketches in one binary and cycles with BOOT (GPIO0), or a click in the bottom strip of the SDL window. The strip is deliberately not the whole window: `imu.h` already reads a click *anywhere* as a shake, and a binary carrying both needs the gestures distinguishable.
 
-It works by including the `shared/` headers at global scope first, then `#include`ing each sketch's `.cpp` inside its own `namespace`. Every shared header is `#pragma once`, so a sketch's own re-includes are no-ops and it binds to the global definitions — which means one `lcd`, one `cv`, and **one** 110KB framebuffer shared by all four rather than four that wouldn't fit. Only the sketches' own symbols land in the namespaces, which is exactly the colliding set (all four define `generate()`, three define `LOOP_MS`, two define `rects[]` at different types).
+It works by including the `shared/` headers at global scope first, then `#include`ing each sketch's `.cpp` inside its own `namespace`. Every shared header is `#pragma once`, so a sketch's own re-includes are no-ops and it binds to the global definitions — which means one `lcd`, one `cv`, and **one** 110KB framebuffer shared by all five rather than five that wouldn't fit. Only the sketches' own symbols land in the namespaces, which is exactly the colliding set (all five define `generate()`, four define `LOOP_MS`, two define `rects[]` at different types).
 
 Two consequences worth knowing:
 
 - **The sketches are unmodified and still build standalone.** Nothing in them refers to the switcher.
-- **A new sketch is not automatically in it.** Add a `namespace` block and a roster entry, or it silently stays out. RAM is the limit to watch: four sketches' file-scope statics already come to 122KB of the 320KB, and the sprite needs 110KB of what's left.
+- **A new sketch is not automatically in it.** Add a `namespace` block and a roster entry, or it silently stays out. RAM is the limit to watch: five sketches' file-scope statics already come to 128KB of the 320KB, and the sprite needs 110KB of what's left.
+
+That 128KB is the number to defend. `skeleton_line.cpp` arrived with a 55KB coverage plane, which as a static would have taken the roster to 183KB — leaving the 110KB sprite hunting for a contiguous block in the ~119KB still free at `panelBegin()` time, which is the kind of margin that fails at boot rather than degrading. It uses `psramAlloc()` instead and costs the switcher 5.5KB. **A new sketch with a buffer this size should do the same** rather than spend internal SRAM, but only if it walks that buffer in spans — PSRAM goes through the data cache, so scan-shaped access is nearly free and random access is not.
 
 `panelBegin()` is idempotent for this reason — a switch re-runs the incoming sketch's `setup()`, and re-initialising the SPI bus and churning a 110KB allocation each time would fragment the heap.
 
@@ -47,7 +50,7 @@ Substitute the env prefix from the table for any other sketch.
 
 There are no tests. The SDL target *is* the test loop — iterate there, flash only to confirm on real hardware.
 
-Requirements: `sdl2` from Homebrew (the native env shells out to `sdl2-config`). The espressif32 toolchain is installed and every environment builds; `shake_esp32` has been flashed and verified on hardware. **The three animated sketches have never been on the board** — their device frame times are arithmetic, not measurement, and each prints a per-phase breakdown to serial so one upload settles it.
+Requirements: `sdl2` from Homebrew (the native env shells out to `sdl2-config`). The espressif32 toolchain is installed and every environment builds; `shake_esp32` has been flashed and verified on hardware. **The four animated sketches have never been on the board** — their device frame times are arithmetic, not measurement, and each prints a per-phase breakdown to serial so one upload settles it.
 
 If the board won't flash: hold BOOT, tap RESET, release BOOT.
 
@@ -57,10 +60,12 @@ If the board won't flash: hold BOOT, tap RESET, release BOOT.
 
 | Header | What it carries |
 |---|---|
-| `platform.h` | shims, both `LGFX` panel classes, `lcd`, `cv`, `W`/`H`, `panelBegin()`, `present()`, `wallMicros()`, and all three entry points |
+| `platform.h` | shims, both `LGFX` panel classes, `lcd`, `cv`, `W`/`H`, `panelBegin()`, `present()`, `wallMicros()`, `psramAlloc()`, and all three entry points |
 | `color.h` | sRGB/oklab/oklch, `wcagContrast`, `deltaEok`, `to565`, `blend565`, `to565Dither`, `shadeL`, `paletteLightest` |
 | `prng.h` | mulberry32 behind the canvas-sketch-util names (`rngRange`, `rngRangeFloor`, `rngChance`, `rngPick`, `rngShuffle`) |
+| `noise.h` | 4D simplex noise — the field behind `Random.noise4D`. Call `noiseSeed()` straight after `rngSeed()`; it burns 255 draws, exactly as `Random.setSeed` does |
 | `palettes.h` | clrs / auto-albers / mindful / found as `0xRRGGBB` tables, plus `randomPalette()` |
+| `subtractive.h` | `generateSubtractiveColors()` — rampensau's hue ramp read as RYB-cube coordinates, i.e. `subtractive-color.ts` |
 | `harmony.h` | the `tintsShades` half of `pro-color-harmonies`, output in Oklch |
 | `dither.h` | Atkinson error diffusion + nearest-neighbour expand |
 | `termfont.h` | 5x8 bitmap font: box-drawing, block, and randomart glyphs |

@@ -46,6 +46,7 @@ static const int H = 320;
 #if defined(ARDUINO)
 
   #include <Arduino.h>
+  #include <esp_heap_caps.h>
 
 #else
 
@@ -300,6 +301,29 @@ static inline bool buttonPressed() {
   if (now - last < BUTTON_DEBOUNCE_MS) return false;
   last = now;
   return true;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Bulk scratch memory
+// ---------------------------------------------------------------------------
+// For a big buffer that does *not* need to be in fast internal SRAM. On device
+// this comes out of the 8MB octal PSRAM, leaving internal DRAM for the one
+// allocation that genuinely needs the speed — the framebuffer.
+//
+// Only reach for this when the access pattern is span- or scan-shaped. PSRAM
+// goes through the data cache, so sequential runs cost about one line fill per
+// 32 bytes; genuinely random access pays the full round trip every time and
+// belongs in a static array instead.
+//
+// Falls back to the internal heap when there is no PSRAM, so a caller only has
+// to check for null. Off-device it is plain malloc.
+static inline void *psramAlloc(size_t n) {
+#if defined(ARDUINO)
+  void *p = heap_caps_malloc(n, MALLOC_CAP_SPIRAM);
+  return p ? p : malloc(n);
+#else
+  return malloc(n);
 #endif
 }
 
