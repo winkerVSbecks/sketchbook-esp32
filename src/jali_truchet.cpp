@@ -52,6 +52,20 @@
 // shifts left by offset/2 so the extruded arch reads centred.
 static const float OFFSET_F = 50.0f / 1080.0f;      // extrusion depth, of width
 
+// How tall the window stands, as a fraction of the original's height. The
+// composition spans 0.10..0.90 of the panel; this scales that band about its
+// centre, so the arch keeps its proportions and its vertical centring and only
+// its height changes. 1.0 is the original. The crown's curvature follows,
+// because CPY is derived from Y_SPRING rather than pinned.
+static const float ARCH_SCALE_Y = 0.75f;
+
+// The band being scaled, as fractions of H: centre, and the half-height and
+// springing offset measured from it. At ARCH_SCALE_Y = 1 these reproduce
+// 0.10 / 0.35 / 0.90 exactly.
+static const float ARCH_MID    = 0.50f;
+static const float ARCH_HALF   = 0.40f;
+static const float ARCH_SPRING = 0.15f;
+
 // Strokes. The original uses lineWidth 4 on 1080px (~0.37% of the canvas),
 // which lands under one pixel here; these are the smallest widths that still
 // read on the panel. The frame is heavier than the lattice on purpose — it is
@@ -67,7 +81,7 @@ static const int CELL = 12;
 // Parallax. TILT_FULL_G is the tilt that pins the lattice to full travel —
 // sin(27 deg) of gravity. The ease is a time-constant low-pass so the lattice
 // settles rather than jitters on accelerometer noise.
-static const int   PARALLAX_MAX  = 10;      // px of lattice travel each way
+static const int   PARALLAX_MAX  = 40;      // px of lattice travel each way
 static const float TILT_FULL_G   = 0.45f;
 static const float TILT_TAU_MS   = 120.0f;
 // -1 reads as a plane behind the window: tilt an edge up and the lattice
@@ -324,9 +338,9 @@ static void geometryInit() {
   X_L      = 0.25f * W - OFFX * 0.5f;
   X_R      = 0.75f * W - OFFX * 0.5f;
   X_C      = 0.50f * W - OFFX * 0.5f;
-  Y_APEX   = 0.10f * H;
-  Y_SPRING = 0.35f * H;
-  Y_BASE   = 0.90f * H;
+  Y_APEX   = (ARCH_MID - ARCH_HALF   * ARCH_SCALE_Y) * H;
+  Y_SPRING = (ARCH_MID - ARCH_SPRING * ARCH_SCALE_Y) * H;
+  Y_BASE   = (ARCH_MID + ARCH_HALF   * ARCH_SCALE_Y) * H;
   CPY      = 0.8f * Y_SPRING;           // the y1*0.8 control every arc shares
   X_LIP    = X_C + 1.25f * OFFX;
   X_SIDE   = X_R + OFFX;
