@@ -4,22 +4,50 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A generative-art sketchbook for the **Waveshare ESP32-S3-LCD-1.47B** (ESP32-S3R8, 172x320 ST7789 IPS over SPI, 8MB octal PSRAM). Sketches are written in the style of canvas-sketch/p5 pieces and ported to C++ on LovyanGFX.
+A generative-art sketchbook for small ESP32-S3 display boards. Sketches are written in the style of canvas-sketch/p5 pieces and ported to C++ on LovyanGFX. Boards so far:
 
-One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`:
-
-| Sketch | Env prefix | Motion |
+| Tag | Board | Panel |
 |---|---|---|
-| `src/main.cpp` | `native` / `esp32` / `arc_shot` | still |
-| `src/arc_tiles_shake.cpp` | `shake_*` | still, but shaking the board (QMI8658 IMU) redraws it; click the window on SDL |
-| `src/collapse.cpp` | `collapse_*` | animated, 6s loop |
-| `src/trochoidal_wave.cpp` | `wave_*` | animated, 4s loop |
-| `src/terminal_charts.cpp` | `charts_*` | animated, 8s scroll loop |
-| `src/skeleton_line.cpp` | `skeleton_*` | animated, 8s loop |
-| `src/jali_truchet.cpp` | `jali_*` | still, but tilt slides the lattice (parallax); shake or BOOT redraws it. SDL: drag = tilt, bottom-strip click = redraw |
-| `src/switcher.cpp` | `switcher_*` | all of the above except `main.cpp` and `jali_truchet.cpp`, in one binary; BOOT cycles |
+| `147` | Waveshare ESP32-S3-LCD-1.47B | 172x320 ST7789 IPS over SPI (ESP32-S3R8, 8MB octal PSRAM) |
+| `a18` | Waveshare ESP32-S3-Touch-AMOLED-1.8 (V1) | 368x448 SH8601 AMOLED over QSPI (ESP32-S3R8, 8MB octal PSRAM, FT3168 touch) |
 
-Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env trio plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
+One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`. Environments are named `<sketch>_<board>` for the device build, plus `_native` (SDL window) and `_shot` (headless PNG capture) suffixes:
+
+| Sketch | Env | Motion |
+|---|---|---|
+| `src/main.cpp` | `arc_147*`, `arc_a18*` | still |
+| `src/arc_tiles_shake.cpp` | `shake_147*` | still, but shaking the board (QMI8658 IMU) redraws it; click the window on SDL |
+| `src/collapse.cpp` | `collapse_147*` | animated, 6s loop |
+| `src/trochoidal_wave.cpp` | `wave_147*` | animated, 4s loop |
+| `src/terminal_charts.cpp` | `charts_147*` | animated, 8s scroll loop |
+| `src/skeleton_line.cpp` | `skeleton_147*` | animated, 8s loop |
+| `src/jali_truchet.cpp` | `jali_147*` | still, but tilt slides the lattice (parallax); shake or BOOT redraws it. SDL: drag = tilt, bottom-strip click = redraw |
+| `src/switcher.cpp` | `switcher_147*`, `switcher_a18*` | all of the above except `main.cpp` and `jali_truchet.cpp`, in one binary; BOOT cycles |
+
+Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env set (device + native + shot, per board it supports) plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
+
+## Boards
+
+A board is a header in `src/shared/boards/` supplying `W`/`H`, the device `LGFX` panel class, `FB_IN_PSRAM`, and the board's pins (`PIN_BOOT`, `PIN_IMU_*`). `platformio.ini` selects it with a `-DBOARD_*` flag via the `native_<tag>` / `shot_<tag>` / `esp32_<tag>` sections; an unflagged build defaults to the 1.47B so stray compiles and IDE indexers keep working. Sketches never include a board header or mention a board name — they draw in terms of `W` and `H`.
+
+Native and headless are per-board too, because `W`/`H` come from the board header and a sketch has to be previewed and captured at the resolution it ships on. **Board support is opt-in per sketch: write a sketch's envs for a board only once it actually composes well at those dimensions — the env list is the support matrix**, greppable, not a promise.
+
+`FB_IN_PSRAM` exists because framebuffer placement is a board fact: the 1.47B's 110KB frame fits in internal SRAM (fast per-pixel work), while a larger panel's frame may not fit internally at all and must go to PSRAM. `panelBegin()` reads it; nothing else should.
+
+The AMOLED-1.8 specifics, verified on hardware (arc tiles renders correctly):
+
+- **The unit in hand is a V1** (SH8601 panel + FT3168 touch). A V2 exists with a CO5300 panel + CST820 touch; if a board stays black on this config, swap the panel subclass in `boards/amoled_18.h` for `lgfx::Panel_CO5300` (shipped by LovyanGFX) before debugging init commands. On a live board the touch chip's I2C address tells them apart: FT3168 at 0x38, CST820 at 0x15.
+- Its 322KB frame forces `FB_IN_PSRAM = true`, which is why `esp32_a18` sets `board_build.arduino.memory_type = qio_opi` — the devkitc-1 board definition defaults to quad PSRAM, these are octal, and quad-init fails silently. Suspicion worth confirming someday: `esp32_147` has the same mismatch, so `psramAlloc()` on the 1.47B probably falls back to internal heap.
+- The panel driver is a tiny `Panel_SH8601_AMOLED18` subclass of LovyanGFX's `Panel_AMOLED` (the `Panel_RM690B0` pattern), QSPI on SCLK=11, data 4/5/6/7, CS=12, no reset pin. Brightness is a panel command (0x51), not a backlight pin. Pins come from the demo zip's `Mylibrary/pin_config.h`.
+- **The glass maps controller columns 16..383, so `offset_x = 16`** — measured on hardware with `board_diag.cpp`'s ruler after Waveshare's demos (which ship 0) reproduced the same 16px black bar. Don't re-derive it from their code. Mounting: with USB down, the framebuffer's x axis runs vertically (x=W at the USB edge) and y runs right-to-left — remember this when mapping tilt or touch.
+- **The QMI8658 needs a soft reset (0x60 <- 0xB0) before configuring or its output registers freeze** — WHO_AM_I answers, reads ack, values never change. `imu.h` does the reset now; the 1.47B happened not to need it. Found because `imuTilt()` printed the same values regardless of orientation.
+- A full 368x448 QSPI push measures ~24ms on hardware (~40fps ceiling). Skeleton line's full frame is ~165ms at this resolution — the roster runs, but the animated sketches want per-board tuning before they feel right.
+- `src/board_diag.cpp` (`diag_a18`) is the bringup diagnostic: corner squares for orientation/mirroring, a labeled ruler that reads out the panel's x offset, and live accel raw bytes + shake prints on serial. Flash it whenever a new board's geometry or IMU is in doubt.
+- Same shared I2C bus for everything: SDA=15, SCL=14 (touch, QMI8658, AXP2101 PMU, PCF85063 RTC). Touch interrupt is GPIO21, unused — `touch.h` polls the FT3168's finger count at 0x38 instead.
+- **Buttons: BOOT and PWR only — there is no RESET.** PWR belongs to the AXP2101 (power on/off), not a GPIO; leave it alone. The reseed gesture is a tap on the glass (`touch.h`), which the switcher turns into a re-entry of the active sketch.
+- **The panel's power rails are OFF at a cold power-on.** They hang off the AXP2101, whose OTP defaults leave them disabled — the factory firmware enabled them, so the panel "just worked" through every warm reset until the first real unplug, then came up black while the ESP32 (on DC1, which does default on) enumerated fine. `boardPowerBegin()` in `boards/amoled_18.h` now replicates the demo's rail set (DC1/DC3 3.3V, ALDO1 1.8, ALDO2 2.8, ALDO3 3.3, ALDO4 3.0, BLDO1/2 3.3) additively — it never disables a rail, so it can't interrupt the one the chip runs on. `panelBegin()` calls it on every board; the 1.47B's is a no-op. **A black panel on a running board (USB enumerates, serial prints) is this, not the panel driver.**
+- **Before porting a dirty-rect sketch** (`collapse.cpp`): these AMOLED controllers have even-coordinate alignment constraints on partial writes (documented for `Panel_RM690B0`; unverified for SH8601). Full-frame pushes are immune, which is all anything does so far.
+- `switcher_a18` hosts all five roster sketches; headless capture confirms each renders at 368x448. Known composition debt: `collapse.cpp` sizes its grid for 172x320 and doesn't cover the AMOLED's canvas — it paints its background only under its own grid, so the previous sketch's pixels stay visible around it. The switcher's internal-SRAM statics grow to 241KB at this resolution, which is fine *here* because the sprite is in PSRAM — don't read the 1.47B's 128KB budget discussion as applying to this board.
 
 ## The two buttons
 
@@ -28,7 +56,7 @@ Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs 
 | Button | Does |
 |---|---|
 | BOOT (GPIO0) | next sketch, wrapping — switcher only. A click in the bottom strip of the SDL window stands in. Standalone `jali_truchet` repurposes it as redraw, which it can only do because it isn't in the roster |
-| RESET | reboot, redraw the *same* sketch from a new seed |
+| RESET | reboot, redraw the *same* sketch from a new seed. **The AMOLED-1.8 has no RESET button** (only BOOT and PWR, and PWR belongs to the AXP2101) — there, a **tap on the glass** is the reseed gesture instead, via `touch.h`: the switcher re-enters the active sketch, whose `setup()` draws fresh from `newSeed()`, no reboot and no flash write. No SDL stand-in — clicks are already spoken for (shake + BOOT strip); relaunch the binary |
 
 RESET has no code behind it and can't have any: it's wired to EN, so software never sees the press. Everything it does falls out of the reboot — every `setup()` calls `generate(newSeed())`. **A new sketch gets this for free and must not add a timer to "help".**
 
@@ -59,19 +87,19 @@ Sketches keep their function-local statics across a switch (playhead cursors, fr
 ## Commands
 
 ```bash
-pio run -e native -t exec         # build + run in an SDL2 window on the Mac (2x scaled)
-pio run -e esp32 -t upload        # build + flash the board
-pio device monitor -b 115200      # serial output from the board
+pio run -e arc_147_native -t exec       # build + run in an SDL2 window on the Mac (2x scaled)
+pio run -e arc_147 -t upload            # build + flash the board (or scripts/flash.sh <sketch>)
+pio device monitor -b 115200            # serial output from the board
 
-pio run -e collapse_shot          # headless capture build...
-.pio/build/collapse_shot/program OUTDIR SEED FRAMES     # ...then run it directly
+pio run -e collapse_147_shot            # headless capture build...
+.pio/build/collapse_147_shot/program OUTDIR SEED FRAMES     # ...then run it directly
 ```
 
-Substitute the env prefix from the table for any other sketch.
+Substitute any sketch/board pair from the table.
 
 There are no tests. The SDL target *is* the test loop — iterate there, flash only to confirm on real hardware.
 
-Requirements: `sdl2` from Homebrew (the native env shells out to `sdl2-config`). The espressif32 toolchain is installed and every environment builds; `shake_esp32` has been flashed and verified on hardware. **The four animated sketches have never been on the board** — their device frame times are arithmetic, not measurement, and each prints a per-phase breakdown to serial so one upload settles it.
+Requirements: `sdl2` from Homebrew (the native env shells out to `sdl2-config`). The espressif32 toolchain is installed and every environment builds; `shake_147` and `arc_a18` have been flashed and verified on hardware. **The four animated sketches have never been on the board standalone** — their device frame times are arithmetic, not measurement, and each prints a per-phase breakdown to serial so one upload settles it.
 
 If the board won't flash: hold BOOT, tap RESET, release BOOT.
 
@@ -81,7 +109,8 @@ If the board won't flash: hold BOOT, tap RESET, release BOOT.
 
 | Header | What it carries |
 |---|---|
-| `platform.h` | shims, both `LGFX` panel classes, `lcd`, `cv`, `W`/`H`, `panelBegin()`, `present()`, `wallMicros()`, `psramAlloc()`, `newSeed()`, `persistGet`/`persistPut`, `buttonBegin`/`buttonPressed`, and all three entry points |
+| `platform.h` | shims, the SDL panel class, board selection, `lcd`, `cv`, `panelBegin()`, `present()`, `wallMicros()`, `psramAlloc()`, `newSeed()`, `persistGet`/`persistPut`, `buttonBegin`/`buttonPressed`, and all three entry points |
+| `boards/*.h` | one per board, included by `platform.h` only: `W`/`H`, the device `LGFX` panel class, `FB_IN_PSRAM`, `PIN_BOOT`, `PIN_IMU_*` |
 | `color.h` | sRGB/oklab/oklch, `wcagContrast`, `deltaEok`, `to565`, `blend565`, `to565Dither`, `shadeL`, `paletteLightest` |
 | `prng.h` | mulberry32 behind the canvas-sketch-util names (`rngRange`, `rngRangeFloor`, `rngChance`, `rngPick`, `rngShuffle`) |
 | `noise.h` | 4D simplex noise — the field behind `Random.noise4D`. Call `noiseSeed()` straight after `rngSeed()`; it burns 255 draws, exactly as `Random.setSeed` does |
@@ -91,6 +120,7 @@ If the board won't flash: hold BOOT, tap RESET, release BOOT.
 | `dither.h` | Atkinson error diffusion + nearest-neighbour expand |
 | `termfont.h` | 5x8 bitmap font: box-drawing, block, and randomart glyphs |
 | `imu.h` | QMI8658 shake detection and `imuTilt()` (the gravity vector, for parallax), with click / drag stand-ins on SDL and a deterministic drift fallback |
+| `touch.h` | `tapDetected()` on boards with a touch controller (`TOUCH_I2C_ADDR` in the board header; FT3168 on the a18). Polled finger count over the shared `Wire` bus — deliberately not LovyanGFX's touch layer, which would fight `Wire` for the peripheral. No SDL stand-in |
 
 Set `SKETCH_TITLE` (and optionally `SKETCH_FRAMES`) *before* including `platform.h`.
 
@@ -114,9 +144,9 @@ In that build `millis()` is a **virtual clock**: it advances only via `delay()` 
 
 | Deterministic — a PNG diff is a real regression test | Not — a PNG diff is noise |
 |---|---|
-| `arc_shot`, `shake_shot`, `collapse_shot`, `charts_shot` | `wave_shot`, `skeleton_shot`, `switcher_shot` |
+| `arc_147_shot`, `shake_147_shot`, `collapse_147_shot`, `charts_147_shot` | `wave_147_shot`, `skeleton_147_shot`, `switcher_147_shot` |
 
-`switcher_shot` is in the right-hand column only because it hosts wave and skeleton; its own logic is deterministic. **Check which column you're in before believing a diff** — single runs of the right-hand three agree often enough to look like proof and then disagree on the next run. For those, assert on something timing-independent instead: comparing `======== [n/5]` entry lines against `Seed:` lines is what actually shows no sketch regenerates behind your back. `collapse.cpp` shows the fix for the underlying problem — a constant `delay(LOOP_MS / SKETCH_FRAMES - 16)` on the headless path.
+`switcher_147_shot` is in the right-hand column only because it hosts wave and skeleton; its own logic is deterministic. **Check which column you're in before believing a diff** — single runs of the right-hand three agree often enough to look like proof and then disagree on the next run. For those, assert on something timing-independent instead: comparing `======== [n/5]` entry lines against `Seed:` lines is what actually shows no sketch regenerates behind your back. `collapse.cpp` shows the fix for the underlying problem — a constant `delay(LOOP_MS / SKETCH_FRAMES - 16)` on the headless path.
 
 ## Hardware facts that are easy to get wrong
 
@@ -124,7 +154,7 @@ In that build `millis()` is a **virtual clock**: it advances only via `delay()` 
 - Panel pins: `SPI2_HOST`, sclk=40, mosi=45, dc=41, cs=42, rst=39. 40MHz write. GPIO40/45 are *not* the S3's IOMUX SPI pins, so 80MHz routes through the GPIO matrix and may corrupt pixels — drop back if it does.
 - The panel is a 172-wide window into 240x320 controller memory: `offset_x = 34`, `invert = true`.
 - `ARDUINO_USB_CDC_ON_BOOT=1` (set in `platformio.ini`) is what makes `Serial.print()` reach USB.
-- **QMI8658 IMU is on I2C SDA=GPIO48, SCL=GPIO47** (400kHz), address 0x6B. The wiki's pinout tables cover only LCD/RGB/TF and omit this; the source is `ESP32-S3-LCD-1.47B-Demo.zip`, where the Arduino (`LVGL_Arduino/I2C_Driver.h`) and ESP-IDF (`main/I2C_Driver/I2C_Driver.h`) demos agree. Do **not** use the ESP32 core's `waveshare_esp32_s3_lcd_147` variant values (SDA=8/SCL=9) — that's generic boilerplate, not this board, and it silently fails the WHO_AM_I probe.
+- **QMI8658 IMU is on I2C SDA=GPIO48, SCL=GPIO47** (400kHz), address 0x6B — carried as `PIN_IMU_*` in `boards/lcd_147b.h`. The wiki's pinout tables cover only LCD/RGB/TF and omit this; the source is `ESP32-S3-LCD-1.47B-Demo.zip`, where the Arduino (`LVGL_Arduino/I2C_Driver.h`) and ESP-IDF (`main/I2C_Driver/I2C_Driver.h`) demos agree. Do **not** use the ESP32 core's `waveshare_esp32_s3_lcd_147` variant values (SDA=8/SCL=9) — that's generic boilerplate, not this board, and it silently fails the WHO_AM_I probe.
 - **The glass corner radius is ~26px**, calibrated by eye on hardware. Deriving it from the spec (~2mm corner ÷ ~0.1mm pixel pitch) gives 20, which reads visibly square against the bezel — trust the board, not the arithmetic. A sketch that wants its composition to sit inside the curve should clip to a *concentric* rounded rect (`SCREEN_RADIUS - MARGIN`), not reuse 26 at an inset; equal radii at different insets give non-parallel curves. See `SCREEN_RADIUS`/`clipCover` in `src/arc_tiles_shake.cpp`.
 - Still unverified: BAT_ADC. Other pins: WS2812 on GPIO38, BOOT button on GPIO0, TF card SDIO CLK=14 CMD=15 D0=16 D1=18 D2=17 D3=21.
 
@@ -150,20 +180,3 @@ These come from `ws_s3_lcd_147b_sketch.ino`'s PORTING NOTES and apply to every s
 
 - `arc_tiles_147b.ino` was a byte-identical copy of `src/main.cpp` and has drifted badly — `main.cpp` has since gained `MAX_COLORS` and then been split onto `src/shared/`, so the `.ino` is now a standalone snapshot of the pre-shared-module design. It still compiles on its own, which is the trap. Re-copy it or leave it alone deliberately; don't edit it as if it were live code.
 - `ws_s3_lcd_147b_sketch.ino` is an earlier, separate sketch (sliding-blind system) that carries a canvas-2d-shaped shim — `ctxSave`/`ctxRestore`/`translate`/`clipRect`/`fillStyle` over a `GState` stack — plus an `oklch(L, C, h) -> RGB565` converter. Worth lifting from when a new sketch wants ctx-style structure.
-
-## Arduino IDE mirrors
-
-These sketches also run from the Arduino IDE, which needs `foo/foo.ino`. **Copy `src/shared/` alongside the sketch** — a sketch is no longer self-contained, and the IDE resolves `#include "shared/platform.h"` relative to `sketch.h`:
-
-```bash
-cp src/arc_tiles_shake.cpp ~/Documents/Arduino/arc_tiles_shake/sketch.h
-cp -R src/shared           ~/Documents/Arduino/arc_tiles_shake/
-```
-
-A stale `shared/` next to a fresh `sketch.h` is the failure mode to watch for — it compiles, and misbehaves. Re-copy both together, every time.
-
-**Don't paste a sketch straight into a `.ino`.** The Arduino builder auto-generates function prototypes and injects them above the type definitions they reference, so `drawCell(const GridCell&, ...)` fails with `'GridCell' does not name a type` — pointing at the definition, not the injected line. Each sketch folder is therefore a one-line `.ino` (`#include "sketch.h"`) plus the real code in `sketch.h`; headers are exempt from prototype injection, and the `#include` keeps it a single translation unit.
-
-Board: **Waveshare ESP32-S3-LCD-1.47** (in the ESP32 core, 3.3.11+). Every Tools default is right except **USB CDC On Boot → Enabled** — that's the IDE equivalent of `-DARDUINO_USB_CDC_ON_BOOT=1`, and without it `Serial.print()` never reaches USB.
-
-If the IDE throws `fatal error: opening dependency file ... .libsdetect.d`, that's its background indexer racing another build over `~/Library/Caches/arduino/sketches/` — **Sketch → Clean** and rebuild. A different file named each time is the tell.

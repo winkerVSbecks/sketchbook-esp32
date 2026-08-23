@@ -6,6 +6,10 @@
 //   BOOT (GPIO0)   advance to the next sketch; wraps around. On SDL, click the
 //                  bottom strip of the window.
 //   RESET          reboot, and come back to the *same* sketch with a new seed.
+//   tap the glass  reseed the sketch you are on, without the reboot — the
+//                  stand-in for RESET on boards that have a touch controller
+//                  but no RESET button (the AMOLED-1.8 has only BOOT and PWR,
+//                  and PWR belongs to its power-management chip).
 //
 // RESET only manages that second half because the roster position is written to
 // flash on every BOOT press and read back in setup(). It has to be flash:
@@ -35,8 +39,8 @@
 // from inside its namespace the second include is a no-op and the sketch binds
 // to the global definitions from step 1. Everything platform.h declares is
 // `static`, so step 1 also means there is exactly one `lcd`, one `cv`, and one
-// 110KB framebuffer for all five sketches to share — rather than five of each,
-// which would not fit in SRAM. Only the sketches' own symbols land inside the
+// full-frame framebuffer for all five sketches to share — rather than five of
+// each, which would not fit. Only the sketches' own symbols land inside the
 // namespaces, which is precisely the set that was colliding.
 //
 // Sharing the framebuffer is not the whole RAM story: skeleton_line.cpp's 55KB
@@ -46,8 +50,9 @@
 //
 // The sketches are unmodified and their own envs still build them standalone.
 //
-//   pio run -e switcher_native -t exec    # SDL; click low in the window
-//   pio run -e switcher_esp32 -t upload   # board; press BOOT, then RESET
+//   pio run -e switcher_147_native -t exec    # SDL; click low in the window
+//   pio run -e switcher_147 -t upload         # board; press BOOT, then RESET
+//                                             # (or _a18 for the AMOLED)
 // ============================================================================
 #define SKETCH_TITLE "switcher"
 
@@ -63,6 +68,7 @@
 #include "shared/imu.h"
 #include "shared/noise.h"
 #include "shared/subtractive.h"
+#include "shared/touch.h"
 #include <string.h>
 
 // Step 2 — the sketches. SKETCH_TITLE/SKETCH_FRAMES are #undef'd ahead of each
@@ -146,8 +152,9 @@ void setup() {
   delay(300);
 
   buttonBegin();
+  touchBegin();
 
-  Serial.printf("\nswitcher: %d sketches, BOOT cycles, RESET reseeds\n", N_SKETCHES);
+  Serial.printf("\nswitcher: %d sketches, BOOT cycles, RESET/tap reseeds\n", N_SKETCHES);
   for (int i = 0; i < N_SKETCHES; i++) Serial.printf("  %d. %s\n", i + 1, SKETCHES[i].name);
 
   // Clamped, not trusted: the stored index outlives the binary that wrote it,
@@ -181,6 +188,14 @@ void loop() {
   // 5-40ms, so the longest a press can go unnoticed is one frame.
   if (buttonPressed()) {
     advance();
+    return;
+  }
+  // Same composition-holds contract as RESET, minus the reboot: re-enter the
+  // active sketch, whose setup() draws fresh from newSeed(). No flash write —
+  // the roster position hasn't changed.
+  if (tapDetected()) {
+    Serial.println("tap: reseed");
+    enter(active);
     return;
   }
   SKETCHES[active].loop();
