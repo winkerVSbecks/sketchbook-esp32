@@ -1,9 +1,9 @@
 // ============================================================================
-// platform.h — dual-target scaffolding shared by every sketch in this repo
+// platform.h — target and board scaffolding shared by every sketch in this repo
 // ============================================================================
 // Supplies the three things that are identical across sketches and easy to get
-// subtly wrong: the SDL/Arduino shims, the panel configuration for both
-// targets, and the full-frame sprite everything draws into.
+// subtly wrong: the SDL/Arduino shims, the panel configuration (per board, via
+// boards/*.h), and the full-frame sprite everything draws into.
 //
 // A sketch includes this first, optionally after defining:
 //
@@ -37,8 +37,18 @@
   #define SKETCH_FRAMES 1
 #endif
 
-static const int W = 172;
-static const int H = 320;
+// ---------------------------------------------------------------------------
+// Board
+// ---------------------------------------------------------------------------
+// The board header supplies W/H, the device LGFX panel class, FB_IN_PSRAM,
+// and the board's pins (PIN_BOOT, PIN_IMU_*). Selected by a -DBOARD_* build
+// flag from platformio.ini; an unflagged build gets the 1.47B, so plain
+// includes and IDE indexers keep working.
+#if defined(BOARD_AMOLED_18)
+  #include "boards/amoled_18.h"
+#else
+  #include "boards/lcd_147b.h"
+#endif
 
 // ---------------------------------------------------------------------------
 // Platform shims
@@ -105,36 +115,10 @@ static const int H = 320;
 // ---------------------------------------------------------------------------
 // Panel
 // ---------------------------------------------------------------------------
-#if defined(ARDUINO)
-
-class LGFX : public lgfx::LGFX_Device {
-  lgfx::Panel_ST7789 _panel;
-  lgfx::Bus_SPI      _bus;
-  lgfx::Light_PWM    _light;
-public:
-  LGFX(void) {
-    { auto c = _bus.config();
-      c.spi_host = SPI2_HOST; c.spi_mode = 0;
-      c.freq_write = 40000000; c.freq_read = 16000000;
-      c.spi_3wire = true; c.use_lock = true; c.dma_channel = SPI_DMA_CH_AUTO;
-      c.pin_sclk = 40; c.pin_mosi = 45; c.pin_miso = -1; c.pin_dc = 41;
-      _bus.config(c); _panel.setBus(&_bus); }
-    { auto c = _panel.config();
-      c.pin_cs = 42; c.pin_rst = 39; c.pin_busy = -1;
-      c.memory_width = 240; c.memory_height = 320;
-      c.panel_width  = W;   c.panel_height  = H;
-      c.offset_x = 34; c.offset_y = 0; c.offset_rotation = 0;
-      c.readable = false; c.invert = true; c.rgb_order = false;
-      c.dlen_16bit = false; c.bus_shared = false;
-      _panel.config(c); }
-    { auto c = _light.config();
-      c.pin_bl = 46; c.invert = false; c.freq = 44100; c.pwm_channel = 7;
-      _light.config(c); _panel.setLight(&_light); }
-    setPanel(&_panel);
-  }
-};
-
-#else
+// The device build's LGFX class comes from the board header above. The SDL
+// window is the same for every board — a W x H canvas at 2x — so its class
+// lives here.
+#if !defined(ARDUINO)
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_sdl _panel;
@@ -279,7 +263,6 @@ static bool writeFramePng(const char *path) {
 // a click *anywhere* as a shake, and a binary hosting both needs the two
 // gestures to stay tellable apart. There is no RESET stand-in — relaunch the
 // binary, which reseeds from the clock (see main() at the foot of this file).
-static const int      PIN_BOOT           = 0;
 static const uint32_t BUTTON_DEBOUNCE_MS = 200;
 static const int      BUTTON_SDL_STRIP_H = 48;
 
@@ -415,9 +398,12 @@ static inline void *psramAlloc(size_t n) {
 // Framebuffer lifecycle
 // ---------------------------------------------------------------------------
 
-// Bring up the panel and allocate the 110KB full-frame sprite in internal
-// SRAM. Returns false if the allocation failed — always check it; a silent
-// null sprite draws nothing and looks like a logic bug.
+// Bring up the panel and allocate the full-frame sprite (W*H*2 bytes). Where
+// it lands is the board's call, via FB_IN_PSRAM: the 1.47B's 110KB frame fits
+// in internal SRAM, which is what makes per-pixel work on it cheap; a frame
+// too big to fit internally (the AMOLED-1.8's 322KB) goes to PSRAM instead.
+// Returns false if the allocation failed — always check it; a silent null
+// sprite draws nothing and looks like a logic bug.
 //
 // Idempotent. A sketch calls this from its own setup(), so a binary hosting
 // several sketches (switcher.cpp) runs it again on every switch — re-initing
@@ -438,7 +424,7 @@ static inline bool panelBegin(uint8_t brightness = 170) {
 #endif
   if (up) return cv.getBuffer() != nullptr;
   up = true;
-  cv.setPsram(false);
+  cv.setPsram(FB_IN_PSRAM);
   cv.setColorDepth(16);
   return cv.createSprite(W, H) != nullptr;
 }

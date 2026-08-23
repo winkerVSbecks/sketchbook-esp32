@@ -1,14 +1,9 @@
 // ============================================================================
 // imu.h — shake gesture from the QMI8658, with a click stand-in on SDL
 // ============================================================================
-// Device: the QMI8658 6-axis IMU over I2C. The Waveshare wiki's pinout tables
-// cover only the LCD, RGB LED and TF card, but ESP32-S3-LCD-1.47B-Demo.zip
-// pins the bus down: I2C_SDA_PIN 48 / I2C_SCL_PIN 47, agreed on by both the
-// Arduino (I2C_Driver.h) and ESP-IDF (I2C_Driver.h) demos.
-//
-// Do NOT take these from the ESP32 core's waveshare_esp32_s3_lcd_147 variant —
-// its SDA=8/SCL=9 are generic boilerplate, not this board's wiring, and they
-// fail the WHO_AM_I probe silently.
+// Device: the QMI8658 6-axis IMU over I2C, on the pins the board header
+// supplies (PIN_IMU_SDA / PIN_IMU_SCL — provenance and warnings live there,
+// next to the numbers).
 //
 // Desktop: click the window.
 //
@@ -37,9 +32,6 @@ static inline void _tiltDrift(float &gx, float &gy) {
 #if defined(ARDUINO)
 
 #include <Wire.h>
-
-static const int PIN_IMU_SDA = 48;
-static const int PIN_IMU_SCL = 47;
 
 static const uint8_t QMI_WHO_AM_I = 0x00;   // reads 0x05
 static const uint8_t QMI_CTRL1    = 0x02;

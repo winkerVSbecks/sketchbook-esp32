@@ -3,8 +3,8 @@
 # Flash a sketch from this repo to the Waveshare ESP32-S3-LCD-1.47B.
 #
 #   flash.sh                          list environments and exit
-#   flash.sh arc_tiles_shake.cpp      resolve to that sketch's esp32 env, build + upload
-#   flash.sh shake_esp32              use an environment name directly
+#   flash.sh arc_tiles_shake.cpp      resolve to that sketch's device env, build + upload
+#   flash.sh shake_147                use an environment name directly
 #   flash.sh <target> --build         build only, don't touch the board
 #
 # Resolving the environment is the point of this script: `build_src_filter`

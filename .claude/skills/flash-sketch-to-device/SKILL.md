@@ -20,7 +20,7 @@ Two routes exist and they are not equivalent. Pick deliberately.
 The SDL target is the test loop. A device flash takes ~1 minute plus a reconnect; SDL takes seconds and catches every logic bug. Flash to confirm physical properties — panel orientation, colour, backlight, sensors — not to find bugs you could have found on the desktop.
 
 ```bash
-pio run -e shake_native -t exec    # or -e native
+pio run -e shake_147_native -t exec
 ```
 
 ## Route 1: PlatformIO
@@ -29,8 +29,8 @@ Use `scripts/flash.sh` rather than composing the commands by hand:
 
 ```bash
 scripts/flash.sh                        # list environments and their sources
-scripts/flash.sh arc_tiles_shake.cpp    # resolve to its esp32 env, build + upload
-scripts/flash.sh shake_esp32            # or name the environment directly
+scripts/flash.sh arc_tiles_shake.cpp    # resolve to its device env, build + upload
+scripts/flash.sh shake_147              # or name the environment directly
 scripts/flash.sh <target> --build       # build only, don't touch the board
 ```
 
