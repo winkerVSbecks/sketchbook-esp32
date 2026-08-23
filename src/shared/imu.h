@@ -37,6 +37,7 @@ static const uint8_t QMI_WHO_AM_I = 0x00;   // reads 0x05
 static const uint8_t QMI_CTRL1    = 0x02;
 static const uint8_t QMI_CTRL2    = 0x03;
 static const uint8_t QMI_CTRL7    = 0x08;
+static const uint8_t QMI_RESET    = 0x60;   // write 0xB0: soft reset
 static const uint8_t QMI_AX_L     = 0x35;
 
 static const float ACCEL_LSB_PER_G = 4096.0f;   // at +/-8g full scale
@@ -67,6 +68,12 @@ static bool imuBegin() {
     imuAddr = candidates[i];
     uint8_t who = 0;
     if (imuRead(QMI_WHO_AM_I, &who, 1) && who == 0x05) {
+      // Soft reset before configuring — Waveshare's SensorLib always does
+      // this, and on the AMOLED-1.8 it is load-bearing: without it the part
+      // acks every read but its output registers never update (found frozen
+      // on that board; the 1.47B happened not to care).
+      imuWrite(QMI_RESET, 0xB0);
+      delay(20);
       imuWrite(QMI_CTRL1, 0x40);   // auto-increment register address, little endian
       imuWrite(QMI_CTRL2, 0x25);   // accel +/-8g, 250Hz output rate
       imuWrite(QMI_CTRL7, 0x01);   // accel on, gyro off

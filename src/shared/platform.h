@@ -416,6 +416,9 @@ static inline bool panelBegin(uint8_t brightness = 170) {
   (void)brightness;                     // no panel, no backlight, no SDL window
 #else
   if (!up) {
+#if defined(ARDUINO)
+    boardPowerBegin();   // board headers define it; a PMU board turns its rails on here
+#endif
     lcd.init();
     lcd.setRotation(0);
   }
