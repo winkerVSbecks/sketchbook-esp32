@@ -13,10 +13,9 @@
 // checkerboard once half the cells have shrunk away.
 //
 // The original is an fxhash piece on a 3s loop. Here the loop is a gesture:
-// dragging scrubs the playhead with the finger's y motion — relative, either
-// direction, two loops per panel height, wrapping endlessly — and it holds
-// where you leave it. A tap draws a whole new piece. Nothing runs on a clock —
-// see CLAUDE.md, "The two buttons".
+// the finger's y position is the playhead, two loops' worth over the panel
+// height, and it holds where you lift. A tap draws a whole new piece. Nothing
+// runs on a clock — see CLAUDE.md, "The two buttons".
 // ============================================================================
 
 #define SKETCH_TITLE  "zhi"
@@ -315,9 +314,6 @@ static bool pollTouch() {
   static bool     scrub   = false;
   static uint32_t startAt = 0;
   static int      startX = 0, startY = 0;
-  static int      anchorY  = 0;      // finger y when the press became a scrub
-  static float    anchorPh = 0.0f;   // playhead at that same moment
-
   int tx = 0, ty = 0;
   const bool now = touchPoint(&tx, &ty);
 
@@ -333,21 +329,13 @@ static bool pollTouch() {
   if (now) {
     if (!scrub) {
       const int dx = tx - startX, dy = ty - startY;
-      if (dx * dx + dy * dy >= TAP_SLOP * TAP_SLOP || millis() - startAt >= TAP_MS) {
-        scrub    = true;
-        anchorY  = ty;
-        anchorPh = playhead;
-      }
+      if (dx * dx + dy * dy >= TAP_SLOP * TAP_SLOP || millis() - startAt >= TAP_MS) scrub = true;
     }
-    if (scrub) {
-      // Relative scrubbing: the breath picks up from wherever it was held and
-      // follows the finger's y motion, either direction, at two loops per
-      // panel height. |cos(pi*p - d)| has period 1 in p, so wrapping instead
-      // of clamping makes the scrub endless — no jump on touch-down and no
-      // dead zone at the edges.
-      const float ph = anchorPh + (float)(ty - anchorY) * 2.0f / (float)(H - 1);
-      playhead = ph - 2.0f * floorf(ph / 2.0f);
-    }
+    // Absolute: the finger's y position IS the playhead, two loops over the
+    // panel height, so the wave always sits where the finger is — relative
+    // tracking read as disconnected from the touch. |cos(pi*p - d)| has
+    // period 1 in p, so the top and bottom edges meet the same frame.
+    if (scrub) playhead = H > 1 ? clampf((float)ty / (float)(H - 1), 0.0f, 1.0f) * 2.0f : 0.0f;
     return false;
   }
 
