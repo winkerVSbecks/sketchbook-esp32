@@ -13,9 +13,10 @@
 // checkerboard once half the cells have shrunk away.
 //
 // The original is an fxhash piece on a 3s loop. Here the loop is a gesture: the
-// playhead is the finger's x position, so the breath only moves while you move,
-// and holds where you left it. A tap draws a whole new piece. Nothing runs on a
-// clock — see CLAUDE.md, "The two buttons".
+// playhead is the finger's y position, two loops' worth over the panel height,
+// so the breath only moves while you move and holds where you left it. A tap
+// draws a whole new piece. Nothing runs on a clock — see CLAUDE.md, "The two
+// buttons".
 // ============================================================================
 
 #define SKETCH_TITLE  "zhi"
@@ -332,7 +333,9 @@ static bool pollTouch() {
       const int dx = tx - startX, dy = ty - startY;
       if (dx * dx + dy * dy >= TAP_SLOP * TAP_SLOP || millis() - startAt >= TAP_MS) scrub = true;
     }
-    if (scrub) playhead = W > 1 ? clampf((float)tx / (float)(W - 1), 0.0f, 1.0f) : 0.0f;
+    // y over the panel's long axis, spanning two whole loops — |cos(pi*p - d)|
+    // has period 1 in p, so a full top-to-bottom swipe runs the breath twice.
+    if (scrub) playhead = H > 1 ? clampf((float)ty / (float)(H - 1), 0.0f, 1.0f) * 2.0f : 0.0f;
     return false;
   }
 
