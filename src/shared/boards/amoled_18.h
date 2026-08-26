@@ -43,8 +43,10 @@ static const int PIN_IMU_SDA = 15;
 static const int PIN_IMU_SCL = 14;
 
 // FT3168 capacitive touch, for touch.h. Tap stands in for the RESET button
-// this board doesn't have: tap the glass, get a new composition.
-static const int TOUCH_I2C_ADDR = 0x38;
+// this board doesn't have: tap the glass, get a new composition. The FT3168
+// acks I2C whether or not a finger is down, unlike the CST816 family.
+static const int  TOUCH_I2C_ADDR        = 0x38;
+static const bool TOUCH_NACKS_WHEN_IDLE = false;
 
 #if defined(ARDUINO)
 

@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 600" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
+  <style>
+    .box    { fill: #f6f8fa; stroke: #d0d7de; rx: 8; }
+    .accent { fill: #ddf4ff; stroke: #54aeff; rx: 6; }
+    .txt    { fill: #1f2328; }
+    .muted  { fill: #57606a; }
+    .title  { fill: #1f2328; font-weight: 600; }
+    .edge   { stroke: #8c959f; stroke-width: 1.5; fill: none; }
+    .lbl    { fill: #57606a; font-size: 11px; }
+    @media (prefers-color-scheme: dark) {
+      .box    { fill: #161b22; stroke: #30363d; }
+      .accent { fill: #0d2846; stroke: #1f6feb; }
+      .txt    { fill: #e6edf3; }
+      .muted  { fill: #8b949e; }
+      .title  { fill: #e6edf3; }
+      .edge   { stroke: #6e7681; }
+      .lbl    { fill: #8b949e; }
+      .head   { fill: #6e7681; }
+    }
+    .head { fill: #8c959f; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9" class="edge"/>
+    </marker>
+  </defs>
+
+  <!-- sketches -->
+  <rect class="box" x="40" y="28" width="440" height="104" rx="8"/>
+  <text class="title" x="60" y="54">src/*.cpp — one sketch, one file</text>
+  <text class="txt"   x="60" y="80">arc tiles · shake · collapse · trochoidal wave</text>
+  <text class="txt"   x="60" y="100">terminal charts · skeleton line · jali truchet</text>
+  <text class="muted" x="60" y="122">each defines only setup() and loop()</text>
+
+  <!-- switcher -->
+  <rect class="box" x="520" y="28" width="300" height="104" rx="8"/>
+  <text class="title" x="540" y="54">switcher.cpp</text>
+  <text class="txt"   x="540" y="80">the roster in one binary,</text>
+  <text class="txt"   x="540" y="100">each sketch in a namespace</text>
+  <text class="muted" x="540" y="122">BOOT cycles · RESET / tap reseeds</text>
+
+  <!-- edges: sketches -> shared -->
+  <path class="edge" d="M 260 132 L 260 192" marker-end="url(#arrow)"/>
+  <path class="edge" d="M 670 132 L 670 158 L 380 158 L 380 192" marker-end="url(#arrow)"/>
+  <text class="lbl" x="272" y="166">#include</text>
+
+  <!-- shared modules -->
+  <rect class="box" x="40" y="196" width="460" height="168" rx="8"/>
+  <text class="title" x="60" y="222">src/shared/ — header-only modules</text>
+  <rect class="accent" x="60" y="236" width="420" height="46" rx="6"/>
+  <text class="txt"   x="74" y="255">platform.h — lcd · cv · panelBegin() · present()</text>
+  <text class="txt"   x="74" y="273">newSeed() · persist · buttons · all entry points</text>
+  <text class="txt"   x="60" y="308">color · prng · noise · palettes · harmony</text>
+  <text class="txt"   x="60" y="328">subtractive · dither · termfont · imu · touch</text>
+  <text class="muted" x="60" y="352">sketches draw in terms of W and H, never a board name</text>
+
+  <!-- boards -->
+  <rect class="box" x="560" y="196" width="260" height="168" rx="8"/>
+  <text class="title" x="580" y="222">src/shared/boards/*.h</text>
+  <text class="txt"   x="580" y="250">lcd_147b — 172×320 ST7789</text>
+  <text class="txt"   x="580" y="272">amoled_18 — 368×448 SH8601</text>
+  <text class="txt"   x="580" y="294">touch_lcd_2 — 240×320 ST7789T3</text>
+  <text class="muted" x="580" y="326">W · H · LGFX panel · pins ·</text>
+  <text class="muted" x="580" y="344">FB_IN_PSRAM</text>
+
+  <!-- edge: boards -> platform.h -->
+  <path class="edge" d="M 560 260 L 500 260" marker-end="url(#arrow)"/>
+  <text class="lbl" x="556" y="248" text-anchor="end">-DBOARD_*</text>
+
+  <!-- edge: shared -> canvas -->
+  <path class="edge" d="M 160 364 L 160 420" marker-end="url(#arrow)"/>
+  <text class="lbl" x="172" y="396">draws into</text>
+
+  <!-- canvas -->
+  <rect class="box" x="40" y="424" width="240" height="88" rx="8"/>
+  <text class="title" x="60" y="452">LGFX_Sprite cv</text>
+  <text class="txt"   x="60" y="476">full-frame canvas, RGB565</text>
+  <text class="muted" x="60" y="498">W × H × 2 bytes</text>
+
+  <!-- edge: canvas -> targets -->
+  <path class="edge" d="M 280 468 L 336 468" marker-end="url(#arrow)"/>
+  <text class="lbl" x="284" y="456">present()</text>
+
+  <!-- targets -->
+  <text class="head" x="344" y="416" font-size="11">one pio env per sketch × board × target</text>
+
+  <rect class="box" x="344" y="424" width="148" height="88" rx="8"/>
+  <text class="title" x="360" y="452">device</text>
+  <text class="txt"   x="360" y="476">pushSprite to</text>
+  <text class="txt"   x="360" y="494">the panel</text>
+
+  <rect class="box" x="508" y="424" width="148" height="88" rx="8"/>
+  <text class="title" x="524" y="452">_native</text>
+  <text class="txt"   x="524" y="476">SDL2 window</text>
+  <text class="txt"   x="524" y="494">on the Mac</text>
+
+  <rect class="box" x="672" y="424" width="148" height="88" rx="8"/>
+  <text class="title" x="688" y="452">_shot</text>
+  <text class="txt"   x="688" y="476">headless PNG</text>
+  <text class="txt"   x="688" y="494">frame capture</text>
+
+  <text class="muted" x="40" y="556">envs: switcher_147 · arc_a18_native · collapse_147_shot · … — the env list is the board-support matrix</text>
+</svg>

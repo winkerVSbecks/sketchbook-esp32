@@ -1,9 +1,18 @@
 ---
 name: flash-sketch-to-device
-description: Get a sketch from this repo running on the physical Waveshare ESP32-S3-LCD-1.47B board, via PlatformIO or the Arduino IDE, and confirm it actually works. Use whenever the user wants to flash, upload, deploy, or "put this on the board", asks how to run a sketch on the device or on hardware, is picking Arduino IDE Tools settings for this board, or is debugging a failed upload, a blank panel, missing serial output, or an on-device behaviour that works fine in the SDL build.
+description: Get a sketch from this repo running on one of its physical Waveshare ESP32-S3 boards (LCD-1.47B, Touch-AMOLED-1.8, Touch-LCD-2), via PlatformIO or the Arduino IDE, and confirm it actually works. Use whenever the user wants to flash, upload, deploy, or "put this on the board", asks how to run a sketch on the device or on hardware, is picking Arduino IDE Tools settings for these boards, or is debugging a failed upload, a blank panel, missing serial output, or an on-device behaviour that works fine in the SDL build.
 ---
 
-# Flashing a sketch to the ESP32-S3-LCD-1.47B
+# Flashing a sketch to the board
+
+Written for the ESP32-S3-LCD-1.47B; the routes and verification discipline
+apply to every board in the repo. Board-specific facts live elsewhere: the
+Touch-AMOLED-1.8 in `CLAUDE.md` (no RESET button; a black panel on a running
+board is the AXP2101 rails), the Touch-LCD-2 in
+`port-canvas-sketch-to-esp32/references/board-touch-lcd-2.md` (no dedicated
+Arduino IDE variant — ESP32S3 Dev Module with USB CDC On Boot Enabled,
+**OPI PSRAM**, 16MB flash set by hand; backlight GPIO1; touch CST816D NACKs
+while untouched).
 
 Two routes exist and they are not equivalent. Pick deliberately.
 

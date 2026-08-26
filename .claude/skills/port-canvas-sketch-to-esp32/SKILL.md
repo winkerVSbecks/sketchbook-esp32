@@ -1,6 +1,6 @@
 ---
 name: port-canvas-sketch-to-esp32
-description: Port JavaScript/TypeScript canvas generative art sketches (ssam, canvas-sketch, p5, raw 2D context) to C++ running on a Waveshare ESP32-S3-LCD-1.47B, with a native SDL build for fast iteration. Use this whenever the user wants to run a sketch on hardware, put a generative piece on a small display, port canvas code to a microcontroller, or mentions the ESP32-S3-LCD-1.47B, LovyanGFX, ST7789, or "get this sketch on the board" — even if they only describe the sketch and the display without using the word "port".
+description: Port JavaScript/TypeScript canvas generative art sketches (ssam, canvas-sketch, p5, raw 2D context) to C++ running on the repo's Waveshare ESP32-S3 display boards (LCD-1.47B, Touch-AMOLED-1.8, Touch-LCD-2), with a native SDL build for fast iteration. Use this whenever the user wants to run a sketch on hardware, put a generative piece on a small display, port canvas code to a microcontroller, or mentions one of those boards, LovyanGFX, ST7789, SH8601, CST816, or "get this sketch on the board" — even if they only describe the sketch and the display without using the word "port".
 ---
 
 # Porting canvas sketches to the ESP32-S3-LCD-1.47B
@@ -114,9 +114,15 @@ code does, and let them decide. Say which fixes also apply to the JS side.
 
 ## References
 
-- `references/board-and-toolchain.md` — verified pin config, `platformio.ini`,
-  platform shims, SDL entry point, flashing, and the panel-config checklist.
-  Read this before writing any project files.
+- `references/board-and-toolchain.md` — verified pin config for the
+  **LCD-1.47B**, `platformio.ini`, platform shims, SDL entry point, flashing,
+  and the panel-config checklist. Read this before writing any project files.
+- `references/board-touch-lcd-2.md` — verified pin config and bringup notes
+  for the **Touch-LCD-2** (2", 240×320, ST7789T3 + CST816D touch), from its
+  demo zip and schematic. The board is researched but not yet brought up in
+  the repo; start there when it is.
+- The **Touch-AMOLED-1.8** is already brought up; its facts live in the repo's
+  `CLAUDE.md` and `src/shared/boards/amoled_18.h`.
 - `references/porting-patterns.md` — JS→C++ translation rules, seeded PRNG,
   colour conversion, the analytic AA recipe, performance notes. Read this
   before writing any drawing code.
