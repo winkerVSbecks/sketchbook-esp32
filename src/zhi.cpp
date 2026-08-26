@@ -13,8 +13,8 @@
 // checkerboard once half the cells have shrunk away.
 //
 // The original is an fxhash piece on a 3s loop. Here the loop is a gesture:
-// the finger's y position is the playhead, two loops' worth over the panel
-// height, and it holds where you lift. A tap draws a whole new piece. Nothing
+// the finger's y position is the playhead, one loop over the panel height,
+// and it holds where you lift. A tap draws a whole new piece. Nothing
 // runs on a clock — see CLAUDE.md, "The two buttons".
 // ============================================================================
 
@@ -331,11 +331,11 @@ static bool pollTouch() {
       const int dx = tx - startX, dy = ty - startY;
       if (dx * dx + dy * dy >= TAP_SLOP * TAP_SLOP || millis() - startAt >= TAP_MS) scrub = true;
     }
-    // Absolute: the finger's y position IS the playhead, two loops over the
+    // Absolute: the finger's y position IS the playhead, one loop over the
     // panel height, so the wave always sits where the finger is — relative
     // tracking read as disconnected from the touch. |cos(pi*p - d)| has
     // period 1 in p, so the top and bottom edges meet the same frame.
-    if (scrub) playhead = H > 1 ? clampf((float)ty / (float)(H - 1), 0.0f, 1.0f) * 2.0f : 0.0f;
+    if (scrub) playhead = H > 1 ? clampf((float)ty / (float)(H - 1), 0.0f, 1.0f) : 0.0f;
     return false;
   }
 
