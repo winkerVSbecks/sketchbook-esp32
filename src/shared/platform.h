@@ -46,6 +46,8 @@
 // includes and IDE indexers keep working.
 #if defined(BOARD_AMOLED_18)
   #include "boards/amoled_18.h"
+#elif defined(BOARD_TOUCH_LCD_2)
+  #include "boards/touch_lcd_2.h"
 #else
   #include "boards/lcd_147b.h"
 #endif

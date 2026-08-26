@@ -37,7 +37,8 @@ static const int PIN_IMU_SCL = 47;
 
 // No touch controller on this board — touch.h's tapDetected() is always
 // false here, and RESET covers the reseed gesture instead.
-static const int TOUCH_I2C_ADDR = -1;
+static const int  TOUCH_I2C_ADDR        = -1;
+static const bool TOUCH_NACKS_WHEN_IDLE = false;
 
 #if defined(ARDUINO)
 

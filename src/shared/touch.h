@@ -33,9 +33,14 @@ static inline bool touchBegin() {
   if (TOUCH_I2C_ADDR < 0) return false;
   Wire.begin(PIN_IMU_SDA, PIN_IMU_SCL, 400000);   // shared bus; re-begin is a no-op
   Wire.beginTransmission((uint8_t)TOUCH_I2C_ADDR);
-  _touchUp = Wire.endTransmission() == 0;
-  if (_touchUp) Serial.printf("touch at 0x%02X\n", TOUCH_I2C_ADDR);
-  else          Serial.printf("no touch controller at 0x%02X\n", TOUCH_I2C_ADDR);
+  const bool acked = Wire.endTransmission() == 0;
+  // CST816-family controllers auto-sleep and NACK while untouched, so on a
+  // board that carries one a failed boot-time probe means "asleep", not
+  // "absent" — stay armed and let tapDetected()'s reads settle it.
+  _touchUp = acked || TOUCH_NACKS_WHEN_IDLE;
+  if (acked)          Serial.printf("touch at 0x%02X\n", TOUCH_I2C_ADDR);
+  else if (_touchUp)  Serial.printf("touch at 0x%02X asleep; polling anyway\n", TOUCH_I2C_ADDR);
+  else                Serial.printf("no touch controller at 0x%02X\n", TOUCH_I2C_ADDR);
   return _touchUp;
 }
 
