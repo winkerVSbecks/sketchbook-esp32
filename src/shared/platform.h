@@ -284,8 +284,17 @@ static inline bool buttonPressed() {
   #if defined(ARDUINO)
     const bool down = digitalRead(PIN_BOOT) == LOW;
   #else
+    // A press counts only if it *started* in the strip. A touch-driven sketch
+    // (paint) can legitimately drag a stroke through the strip, and without
+    // the latch that wander would produce a rising edge here and read as a
+    // BOOT press mid-stroke. Click users are unaffected: a click starts where
+    // it lands.
+    static bool rawWas = false, fromStrip = false;
     int32_t tx, ty;
-    const bool down = lcd.getTouch(&tx, &ty) && ty >= H - BUTTON_SDL_STRIP_H;
+    const bool rawDown = lcd.getTouch(&tx, &ty);
+    if (rawDown && !rawWas) fromStrip = ty >= H - BUTTON_SDL_STRIP_H;
+    rawWas = rawDown;
+    const bool down = rawDown && fromStrip;
   #endif
 
   const bool edge = down && !was;

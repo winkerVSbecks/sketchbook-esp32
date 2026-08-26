@@ -24,6 +24,9 @@ One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`. En
 | `src/skeleton_line.cpp` | `skeleton_147*` | animated, 8s loop |
 | `src/jali_truchet.cpp` | `jali_147*` | still, but tilt slides the lattice (parallax); shake or BOOT redraws it. SDL: drag = tilt, bottom-strip click = redraw |
 | `src/switcher.cpp` | `switcher_147*`, `switcher_a18*`, `switcher_t2*` | all of the above except `main.cpp` and `jali_truchet.cpp`, in one binary; BOOT cycles |
+| `src/paint.cpp` | `paint_t2*` | still; drag paints, tap cycles the brush color (touch-first, so t2 only) |
+| `src/zhi.cpp` | `zhi_t2*` | still; finger's y scrubs the breathing grids, tap redraws (touch-first, so t2 only) |
+| `src/switcher_kids.cpp` | `kids_t2*` | paint + zhi in one binary; BOOT swaps, the glass belongs to the active sketch — this switcher must not read taps (see its header) |
 
 Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env set (device + native + shot, per board it supports) plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
 
@@ -93,6 +96,8 @@ That 128KB is the number to defend. `skeleton_line.cpp` arrived with a 55KB cove
 `panelBegin()` is idempotent for this reason — a switch re-runs the incoming sketch's `setup()`, and re-initialising the SPI bus and churning a 110KB allocation each time would fragment the heap. That re-run is also what makes every entry a fresh composition: `setup()` calls `generate(newSeed())`.
 
 Sketches keep their function-local statics across a switch (playhead cursors, frame counters). That's harmless now that nothing regenerates on a timer — a stale cursor is only a phase offset into a cyclic animation, with no deadline left for it to trip. It was not harmless before: `terminal_charts.cpp` compared `millis() / LOOP_MS` against a counter that started at 0, and since the switcher's clock keeps running while other sketches draw, re-entry always read as overdue and threw away the composition `setup()` had just built.
+
+`src/switcher_kids.cpp` (`kids_t2*`) is a second, two-sketch roster built the same way — paint + zhi for small hands. One deliberate difference: **it polls only BOOT and never reads taps**, because both hosted sketches own the glass (paint's tap cycles the brush color; zhi classifies tap-vs-scrub itself), and a switcher-level `tapDetected()` racing paint's press/release timing would wipe a drawing on every crayon change. Its roster position persists under its own NVS key (`kidsketch`), so it and `switcher_t2` don't resume into each other's index when flashed over one another. Swapping away from paint discards the drawing (the incoming `setup()` repaints the shared framebuffer) — inherent to the roster model, not a bug.
 
 ## Commands
 
