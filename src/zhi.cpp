@@ -12,11 +12,11 @@
 // scheme per layer, indexed by column and row parity — which is what reads as a
 // checkerboard once half the cells have shrunk away.
 //
-// The original is an fxhash piece on a 3s loop. Here the loop is a gesture: the
-// playhead is the finger's y position, two loops' worth over the panel height,
-// so the breath only moves while you move and holds where you left it. A tap
-// draws a whole new piece. Nothing runs on a clock — see CLAUDE.md, "The two
-// buttons".
+// The original is an fxhash piece on a 3s loop. Here the loop is a gesture:
+// dragging scrubs the playhead with the finger's y motion — relative, either
+// direction, two loops per panel height, wrapping endlessly — and it holds
+// where you leave it. A tap draws a whole new piece. Nothing runs on a clock —
+// see CLAUDE.md, "The two buttons".
 // ============================================================================
 
 #define SKETCH_TITLE  "zhi"
@@ -315,6 +315,8 @@ static bool pollTouch() {
   static bool     scrub   = false;
   static uint32_t startAt = 0;
   static int      startX = 0, startY = 0;
+  static int      anchorY  = 0;      // finger y when the press became a scrub
+  static float    anchorPh = 0.0f;   // playhead at that same moment
 
   int tx = 0, ty = 0;
   const bool now = touchPoint(&tx, &ty);
@@ -331,11 +333,21 @@ static bool pollTouch() {
   if (now) {
     if (!scrub) {
       const int dx = tx - startX, dy = ty - startY;
-      if (dx * dx + dy * dy >= TAP_SLOP * TAP_SLOP || millis() - startAt >= TAP_MS) scrub = true;
+      if (dx * dx + dy * dy >= TAP_SLOP * TAP_SLOP || millis() - startAt >= TAP_MS) {
+        scrub    = true;
+        anchorY  = ty;
+        anchorPh = playhead;
+      }
     }
-    // y over the panel's long axis, spanning two whole loops — |cos(pi*p - d)|
-    // has period 1 in p, so a full top-to-bottom swipe runs the breath twice.
-    if (scrub) playhead = H > 1 ? clampf((float)ty / (float)(H - 1), 0.0f, 1.0f) * 2.0f : 0.0f;
+    if (scrub) {
+      // Relative scrubbing: the breath picks up from wherever it was held and
+      // follows the finger's y motion, either direction, at two loops per
+      // panel height. |cos(pi*p - d)| has period 1 in p, so wrapping instead
+      // of clamping makes the scrub endless — no jump on touch-down and no
+      // dead zone at the edges.
+      const float ph = anchorPh + (float)(ty - anchorY) * 2.0f / (float)(H - 1);
+      playhead = ph - 2.0f * floorf(ph / 2.0f);
+    }
     return false;
   }
 
