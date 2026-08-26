@@ -47,16 +47,15 @@ static const int GRID[LAYERS][2] = {
 // 21 + 46 + 96 + 290 + 780 = 1233.
 static const int MAX_NODES = 1300;
 
-// Direction sets, one sign per layer. Named in the original as fxhash features.
-static const int8_t DIRECTIONS[4][LAYERS] = {
-  {  1, -1,  1, -1,  1 },   // Cross Over A
-  { -1,  1, -1,  1, -1 },   // Cross Over B
-  { -1, -1, -1, -1, -1 },   // Uniform left
-  {  1,  1,  1,  1,  1 },   // Uniform right
-};
-static const char *DIRECTION_NAMES[4] = {
-  "Cross Over A", "Cross Over B", "Uniform left", "Uniform Right",
-};
+// The original picks a per-layer sign set as an fxhash feature ("Cross Over
+// A/B", "Uniform left/right") — layers sweeping in opposing directions. That
+// doesn't survive the interaction change: with the finger driving the
+// playhead, the wave has to move the way the touch moves, every layer, both
+// directions — and a crossing layer (or the uniform-left set, all of them)
+// always fights the finger. So every layer gets the sign that sends the
+// fronts away from the origin as the playhead grows: down when the finger
+// moves down, back up when it reverses.
+static const int DIR = 1;
 
 // Gesture classification. A press is a tap until it moves TAP_SLOP px or
 // outlives TAP_MS; after that it is a scrub for the rest of its life.
@@ -270,7 +269,6 @@ static void generate(uint32_t seed) {
   // even though the streams differ (mulberry32 here, ARC4 there).
   const float centerHue = rngRange(240.0f, 300.0f);
   const float hueCycle  = rngRange(0.5f, 1.0f);
-  const int   dirSet    = rngIndex(4);
 
   generateRamp(centerHue, hueCycle);
 
@@ -286,10 +284,9 @@ static void generate(uint32_t seed) {
 
   nNodes = 0;
   for (int i = 0; i < LAYERS; i++)
-    createNodes(GRID[i][0], GRID[i][1], DIRECTIONS[dirSet][i]);
+    createNodes(GRID[i][0], GRID[i][1], DIR);
 
-  Serial.printf("centerHue %.2f  hueCycle %.2f  directions %s\n",
-                centerHue, hueCycle, DIRECTION_NAMES[dirSet]);
+  Serial.printf("centerHue %.2f  hueCycle %.2f\n", centerHue, hueCycle);
   Serial.printf("background hsl(%.2f, %.2f%%, %.2f%%)  %d colours  %d nodes\n",
                 bgHsl.h, clampf(bgHsl.s, 0.0f, 1.0f) * 100.0f,
                 clampf(bgHsl.l, 0.0f, 1.0f) * 100.0f, nColors, nNodes);
