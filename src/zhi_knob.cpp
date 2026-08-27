@@ -5,9 +5,12 @@
 //   pio run -e zhi_rk        -t upload   the board
 //   pio run -e zhi_rk_shot               headless PNG capture, then run it
 //
-// The same piece as zhi.cpp — five stacked grids of rectangles breathing as a
-// diagonal wave, colours from the fettepalette lamé ramp — retuned for a
-// square round panel and a different instrument. On the touch boards the
+// The same piece as zhi.cpp — five stacked grids of rectangles breathing,
+// colours from the fettepalette lamé ramp — retuned for a square round panel
+// and a different instrument. One retune is the wave itself: zhi.cpp's wave
+// sweeps diagonally from the top-left corner, but on a round panel there is no
+// corner to sweep from, so here each cell's phase is its distance from the
+// panel centre and the wave moves radially. On the touch boards the
 // finger's y position IS the playhead; here the knob is: one full mechanical
 // revolution is one loop of the breath. |cos(pi*p - d)| has period 1 in p, so
 // the playhead is simply the fractional part of encoderRev() and the wrap at
@@ -55,8 +58,8 @@ static const int GRID[LAYERS][2] = {
 // come to 21 + 40 + 80 + 270 + 760 = 1171.
 static const int MAX_NODES = 1300;
 
-// See zhi.cpp: every layer sweeps away from the origin as the playhead grows,
-// so the wave moves the way the knob turns and never fights it.
+// Every layer sweeps outward from the centre as the playhead grows, so the
+// wave moves the way the knob turns and never fights it.
 static const int DIR = 1;
 
 // ---------------------------------------------------------------------------
@@ -202,7 +205,11 @@ static inline uint16_t clr() { return colors[rngIndex(nColors)]; }
 static void createNodes(int cols, int rows, int dir) {
   const float sizeX = (float)W / (float)cols;
   const float sizeY = (float)H / (float)rows;
-  const float diag  = sqrtf((float)W * (float)W + (float)H * (float)H);
+  // Phase runs on distance from the panel centre, normalised by the
+  // centre-to-corner radius so the full 0..pi range is used edge to edge.
+  const float cx   = (float)W * 0.5f;
+  const float cy   = (float)H * 0.5f;
+  const float maxR = sqrtf(cx * cx + cy * cy);
 
   const uint16_t palette[2][2] = { { clr(), clr() }, { clr(), clr() } };
 
@@ -219,8 +226,12 @@ static void createNodes(int cols, int rows, int dir) {
       n.w = sizeX;
       n.h = sizeY;
       n.color = palette[even ? 0 : 1][(y % 2) == 0 ? 0 : 1];
-      // mapRange(hypot(px, py), 0, hypot(W, H), 0, PI * dir)
-      n.delay = sqrtf(n.x * n.x + n.y * n.y) / diag * (float)M_PI * (float)dir;
+      // The cell's centre, not its corner: a corner-measured radius would skew
+      // the rings off the panel centre by half a cell, most visibly on the
+      // coarse layers.
+      const float dx = (n.x + n.w * 0.5f) - cx;
+      const float dy = (n.y + n.h * 0.5f) - cy;
+      n.delay = sqrtf(dx * dx + dy * dy) / maxR * (float)M_PI * (float)dir;
     }
   }
 }
