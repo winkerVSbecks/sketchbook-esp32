@@ -11,8 +11,8 @@
 // actually draws is 19 concentric rings, each one stripe-period wide, whose
 // stripes are phase-inverted against their neighbours'. The animation slides
 // both patterns sideways by exactly one period per loop, which is what makes
-// the wrap seamless; here the knob is the clock — one revolution slides the
-// stripes one period. The JS's translate(w/2, h/2) before filling anchors the
+// the wrap seamless; here the knob is the clock — a quarter revolution slides
+// the stripes one period (four loops per turn, see knobPlayhead). The JS's translate(w/2, h/2) before filling anchors the
 // pattern space at the canvas centre, and the port keeps that anchoring.
 //
 // Per the user's spec the outer circle fills the screen: R = 120 on the round
@@ -166,11 +166,16 @@ static void renderAll(float ph) {
 
 // ---------------------------------------------------------------------------
 // The knob — see zhi_knob.cpp: the fractional part of the cumulative
-// revolution count IS the playhead, both directions, wrap seamless.
+// revolution count IS the playhead, both directions, wrap seamless. Geared
+// 4x here: a quarter turn slides the stripes one full period, because at 1x
+// the moire crawled — the pattern only moves one stripe width per whole
+// revolution, and the knob felt disconnected from it.
 // ---------------------------------------------------------------------------
+static const float KNOB_CYCLES_PER_REV = 4.0f;
+
 static inline float knobPlayhead() {
-  const float rev = encoderRev();
-  return rev - floorf(rev);
+  const float t = encoderRev() * KNOB_CYCLES_PER_REV;
+  return t - floorf(t);
 }
 
 // ---------------------------------------------------------------------------

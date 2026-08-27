@@ -30,7 +30,7 @@ One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`. En
 | `src/switcher_kids.cpp` | `kids_t2*` | paint + zhi in one binary; BOOT swaps, the glass belongs to the active sketch — this switcher must not read taps (see its header) |
 | `src/zhi_knob.cpp` | `zhi_rk*` | still; turning the knob drives the playhead (one revolution = one loop of the breath), tap redraws (knob-first, so rk only). SDL: drag = knob |
 | `src/isolines.cpp` | `iso_rk*` | still; knob drives the playhead through a noise-field contour loop (one revolution = one loop, wrap seamless), tap redraws (knob-first, so rk only). SDL: drag = knob |
-| `src/circle_moire.cpp` | `moire_rk*` | still; knob slides the stripe moire (one revolution = one period, wrap seamless). No randomness in the piece, so no tap and RESET changes nothing (knob-first, so rk only). SDL: drag = knob |
+| `src/circle_moire.cpp` | `moire_rk*` | still; knob slides the stripe moire (one revolution = four periods, wrap seamless — 1x crawled). No randomness in the piece, so no tap and RESET changes nothing (knob-first, so rk only). SDL: drag = knob |
 
 Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env set (device + native + shot, per board it supports) plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
 
