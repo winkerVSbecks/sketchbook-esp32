@@ -1,20 +1,20 @@
 // ============================================================================
-// switcher_knob.cpp — the three knob sketches in one binary, the knob's
+// switcher_knob.cpp — the knob sketches in one binary, the knob's
 // full-press cycles between them
 // ============================================================================
 // A roster for the rotary board: zhi knob (breathing rect grids), isolines
-// (chromatic noise contours), circle moire (knob-slid stripe rings). All
-// three live on the ring and the glass, which forces the design difference
-// from switcher.cpp:
+// (chromatic noise contours), circle moire (knob-slid stripe rings), chill
+// wave (paper squiggle on riso ink). All of them live on the ring and the
+// glass, which forces the design difference from switcher.cpp:
 //
 //   knob press (GPIO41)  next sketch, wrapping. On SDL, click the bottom
 //                        strip of the window (the drag is already the knob).
 //   RESET                reboot into the *same* sketch, fresh composition.
 //   the glass            belongs to the active sketch, untouched by this
-//                        file — zhi knob and isolines read a tap as reseed,
-//                        so a switcher-level tapDetected() here would race
-//                        theirs and eat every other reseed. Same reasoning
-//                        as switcher_kids.cpp, different gesture.
+//                        file — every sketch but moire reads a tap as
+//                        reseed, so a switcher-level tapDetected() here
+//                        would race theirs and eat every other reseed. Same
+//                        reasoning as switcher_kids.cpp, different gesture.
 //   the ring             also the sketch's: each one reads encoderRev() as
 //                        its own playhead.
 //
@@ -29,8 +29,8 @@
 // other's index when reflashed over one another.
 //
 // Hosting works exactly as switcher.cpp documents: shared headers included at
-// global scope first (the union of what the three sketches use), then each
-// sketch's .cpp inside its own namespace — all three define generate(),
+// global scope first (the union of what the sketches use), then each
+// sketch's .cpp inside its own namespace — all of them define generate(),
 // renderAll(), playhead, knobPlayhead(); the namespaces are what keep those
 // apart while everything binds to one lcd, one cv, one 115KB framebuffer.
 // The sketches are unmodified and still build standalone from their own envs.
@@ -39,10 +39,10 @@
 //   pio run -e switcher_rk -t upload        # board; knob press cycles, RESET reseeds
 // ============================================================================
 #define SKETCH_TITLE  "knob switcher"
-#define SKETCH_FRAMES 6
+#define SKETCH_FRAMES 8
 
-// Step 1 — shared modules at global scope: the union of the three sketches'
-// includes, so their own re-includes are no-ops and all three bind to the one
+// Step 1 — shared modules at global scope: the union of the sketches'
+// includes, so their own re-includes are no-ops and they all bind to the one
 // set of globals.
 #include "shared/platform.h"
 #include "shared/prng.h"
@@ -72,6 +72,12 @@ namespace sk_moire {
 #include "circle_moire.cpp"
 }
 
+#undef SKETCH_TITLE
+#undef SKETCH_FRAMES
+namespace sk_chill {
+#include "chill_wave.cpp"
+}
+
 // ---------------------------------------------------------------------------
 // The roster
 // ---------------------------------------------------------------------------
@@ -85,6 +91,7 @@ static const Sketch SKETCHES[] = {
   { "zhi knob",     sk_zhi::setup,   sk_zhi::loop   },
   { "isolines",     sk_iso::setup,   sk_iso::loop   },
   { "circle moire", sk_moire::setup, sk_moire::loop },
+  { "chill wave",   sk_chill::setup, sk_chill::loop },
 };
 static const int N_SKETCHES = (int)(sizeof(SKETCHES) / sizeof(SKETCHES[0]));
 
