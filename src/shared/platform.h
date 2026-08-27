@@ -48,6 +48,8 @@
   #include "boards/amoled_18.h"
 #elif defined(BOARD_TOUCH_LCD_2)
   #include "boards/touch_lcd_2.h"
+#elif defined(BOARD_ROTARY_128)
+  #include "boards/rotary_128.h"
 #else
   #include "boards/lcd_147b.h"
 #endif

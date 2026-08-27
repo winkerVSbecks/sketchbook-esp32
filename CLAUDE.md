@@ -11,6 +11,7 @@ A generative-art sketchbook for small ESP32-S3 display boards. Sketches are writ
 | `147` | Waveshare ESP32-S3-LCD-1.47B | 172x320 ST7789 IPS over SPI (ESP32-S3R8, 8MB octal PSRAM) |
 | `a18` | Waveshare ESP32-S3-Touch-AMOLED-1.8 (V1) | 368x448 SH8601 AMOLED over QSPI (ESP32-S3R8, 8MB octal PSRAM, FT3168 touch) |
 | `t2` | Waveshare ESP32-S3-Touch-LCD-2 | 240x320 ST7789T3 IPS over SPI (ESP32-S3R8, 8MB octal PSRAM, CST816D touch) |
+| `rk` | ELECROW CrowPanel 1.28" HMI Rotary Display | 240x240 round GC9A01 IPS over SPI (ESP32-S3R8, 8MB octal PSRAM, CST816D touch, 30-detent encoder ring + knob press) |
 
 One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`. Environments are named `<sketch>_<board>` for the device build, plus `_native` (SDL window) and `_shot` (headless PNG capture) suffixes:
 
@@ -27,6 +28,7 @@ One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`. En
 | `src/paint.cpp` | `paint_t2*` | still; drag paints, tap cycles the brush color (touch-first, so t2 only) |
 | `src/zhi.cpp` | `zhi_t2*` | still; finger's y scrubs the breathing grids, tap redraws (touch-first, so t2 only) |
 | `src/switcher_kids.cpp` | `kids_t2*` | paint + zhi in one binary; BOOT swaps, the glass belongs to the active sketch — this switcher must not read taps (see its header) |
+| `src/zhi_knob.cpp` | `zhi_rk*` | still; turning the knob drives the playhead (one revolution = one loop of the breath), tap redraws (knob-first, so rk only). SDL: drag = knob |
 
 Each env sets `build_src_filter` to pick exactly one file. **A new sketch needs its own env set (device + native + shot, per board it supports) plus a filter** — without one, PlatformIO compiles every `.cpp` in `src/` into a single binary and the duplicate `setup()`/`loop()` fail to link. Headers in `src/shared/` are never compiled directly, so they don't need filtering.
 
@@ -61,6 +63,14 @@ The Touch-LCD-2 specifics, verified on hardware (`switcher_t2` flashed; geometry
 - I2C is SDA=48/SCL=47 — the same two GPIOs as the 1.47B's IMU bus, coincidentally. CST816D touch at 0x15, QMI8658 at 0x6B. **CST816s auto-sleep and NACK while untouched** — `TOUCH_NACKS_WHEN_IDLE = true` tells `touchBegin()` a failed boot probe means "asleep", not "absent". Only `no touch controller at 0x15` on serial is a real failure.
 - `FB_IN_PSRAM = true`: the 150KB frame plus the switcher's statics won't reliably fit internal SRAM, and the a18 proved PSRAM placement renders fine. `esp32_t2` sets `qio_opi` for the same reason `esp32_a18` does.
 - SPI runs at the repo's proven 40MHz (~31ms full-frame push, ~32fps ceiling). Waveshare's demos ship 80MHz on these same GPIO-matrix pins (~15ms), so that headroom is real if a sketch needs it — just unexercised here.
+
+The CrowPanel 1.28" Rotary (rk) specifics, **researched but not yet hardware-verified** (all three `zhi_rk` targets build; full research with sources: `.claude/skills/port-canvas-sketch-to-esp32/references/board-rotary-128.md`):
+
+- Pins in `boards/rotary_128.h`, lifted from ELECROW's own demo — which uses LovyanGFX itself, so the GC9A01 config is verbatim, not translated. Zero panel offset; the visible area is the circle inscribed in the 240x240 GRAM, corners crop under the bezel.
+- **GPIO1 and GPIO2 must be driven HIGH before the panel works** — undocumented enables the vendor demo sets first thing; `boardPowerBegin()` replicates them additively. A black panel here: check these before the panel driver.
+- **The CST816D's reset is a real GPIO (13)**, unlike the a18/t2 flexes which reset themselves — `boardPowerBegin()` pulses it and waits ~60ms so the boot probe doesn't mistake a chip still in reset for the usual CST816 auto-sleep. Touch I2C is SDA=6/SCL=7 (carried as `PIN_IMU_*`; there is no IMU on this board).
+- **The encoder ring is 30 detents, 15 quadrature cycles per revolution → `ENC_COUNTS_PER_REV = 60`** (EC3501 C15H30P3 datasheet; its own series table contradicts this — the model code broke the tie). If one physical turn ever sweeps two loops of a sketch, that tie-break was wrong: make it 120. `encoder.h` decodes 4x with IRAM interrupts on A=45/B=42; the knob's full-press is GPIO41 (`PIN_KNOB_BTN`, active low), deliberately not `PIN_BOOT`.
+- 115KB framebuffer, so `FB_IN_PSRAM = false` — the 1.47B's situation, not the t2's. Vendor demo proves PSRAM framebuffers + 80MHz SPI also work if a roster ever needs the internal SRAM back; the header ships the repo's proven 40MHz (~23ms/frame).
 
 ## The two buttons
 
@@ -135,6 +145,7 @@ If the board won't flash: hold BOOT, tap RESET, release BOOT.
 | `dither.h` | Atkinson error diffusion + nearest-neighbour expand |
 | `termfont.h` | 5x8 bitmap font: box-drawing, block, and randomart glyphs |
 | `imu.h` | QMI8658 shake detection and `imuTilt()` (the gravity vector, for parallax), with click / drag stand-ins on SDL and a deterministic drift fallback |
+| `encoder.h` | cumulative rotation from a quadrature knob (`encoderBegin`, `encoderCount`, `encoderRev`), for boards that define `PIN_ENC_A`/`PIN_ENC_B`/`ENC_COUNTS_PER_REV` — a board without them fails the compile, which is the support matrix working. IRAM interrupt decode on device (a per-frame poll drops edges on a flicked knob); SDL stand-in is a vertical mouse drag, one window height per revolution, so a knob sketch must not also read clicks as anything else. Headless reads 0 and sketches sweep their own playhead |
 | `touch.h` | `tapDetected()` on boards with a touch controller (`TOUCH_I2C_ADDR` in the board header; FT3168 on the a18, CST816D on the t2). Polled finger count over the shared `Wire` bus — deliberately not LovyanGFX's touch layer, which would fight `Wire` for the peripheral. CST816s auto-sleep and NACK while untouched, so `TOUCH_NACKS_WHEN_IDLE` in the board header keeps a failed boot probe from disabling tap. No SDL stand-in |
 
 Set `SKETCH_TITLE` (and optionally `SKETCH_FRAMES`) *before* including `platform.h`.
