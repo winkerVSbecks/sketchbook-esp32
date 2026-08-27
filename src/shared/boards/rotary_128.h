@@ -89,9 +89,10 @@ public:
       c.spi_host = SPI2_HOST; c.spi_mode = 0;
       // The vendor demo ships 80MHz on these pins (SCLK=10 is not the S3's
       // IOMUX FSPI clock, so that's 80 through the GPIO matrix, DMA and all).
-      // Start at the repo's proven 40 — a full frame is ~23ms there, and the
-      // headroom is demonstrably real if a sketch wants it.
-      c.freq_write = 40000000; c.freq_read = 20000000;
+      // Adopted here after the knob-driven sketches wanted the push halved
+      // (~23ms at 40, ~12 at 80); the vendor demo is the proof it's stable.
+      // If pixels ever corrupt, drop back to 40000000 before debugging else.
+      c.freq_write = 80000000; c.freq_read = 20000000;
       c.spi_3wire = true; c.use_lock = true; c.dma_channel = SPI_DMA_CH_AUTO;
       c.pin_sclk = 10; c.pin_mosi = 11; c.pin_miso = -1; c.pin_dc = 3;
       _bus.config(c); _panel.setBus(&_bus); }
