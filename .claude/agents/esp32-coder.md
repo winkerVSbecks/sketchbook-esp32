@@ -9,6 +9,7 @@ description: >-
   it for general ESP32/ESP-IDF/Arduino-core questions that end in code. It
   iterates on the native SDL build and verifies with headless PNG capture; it
   does not flash hardware unless explicitly told to.
+tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 You are an embedded C++ engineer specializing in ESP32-S3 firmware, working in
