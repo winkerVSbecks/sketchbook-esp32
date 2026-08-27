@@ -117,6 +117,68 @@
 #endif
 
 // ---------------------------------------------------------------------------
+// Hot-path attributes
+// ---------------------------------------------------------------------------
+// SKETCH_HOT places a function in IRAM on device, so its inner loops never
+// stall on the flash cache. SKETCH_INLINE forces inlining: the Xtensa
+// windowed ABI pays a register-window spill trap every time a call chain
+// oscillates across the register file's depth, which a per-pixel helper
+// called tens of thousands of times a frame does constantly.
+#if defined(ARDUINO)
+  #define SKETCH_HOT IRAM_ATTR
+#else
+  #define SKETCH_HOT
+#endif
+#define SKETCH_INLINE static inline __attribute__((always_inline))
+
+// ---------------------------------------------------------------------------
+// Both cores
+// ---------------------------------------------------------------------------
+// coWork(fn) runs fn(0) on the S3's other core and fn(1) on the calling one,
+// returning when both halves are done. The Arduino loop owns core 1 and core
+// 0 idles (nothing here uses WiFi), so a compute-bound sketch can nearly
+// double its frame rate by splitting work in two — the halves must touch
+// disjoint data, or overlap only where a lost write is harmless (two same-
+// colour strokes racing on a seam pixel, say). Off-device it degrades to two
+// sequential calls, so a sketch's logic never forks by platform.
+typedef void (*CoWorkFn)(int half);
+
+#if defined(ARDUINO)
+
+static TaskHandle_t       _coWorker    = nullptr;
+static TaskHandle_t       _coCaller    = nullptr;
+static volatile CoWorkFn  _coFn        = nullptr;
+
+static void _coWorkerLoop(void *) {
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    _coFn(0);
+    xTaskNotifyGive(_coCaller);
+  }
+}
+
+static inline void coWork(CoWorkFn fn) {
+  if (_coWorker == nullptr) {
+    _coCaller = xTaskGetCurrentTaskHandle();
+    // Core 0, priority above idle so the idle task's watchdog feeder still
+    // runs between frames. 4KB stack: the halves are compute loops, not
+    // recursion.
+    xTaskCreatePinnedToCore(_coWorkerLoop, "coWork", 4096, nullptr, 2,
+                            &_coWorker, 0);
+  }
+  _coFn = fn;
+  xTaskNotifyGive(_coWorker);
+  fn(1);
+  ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+}
+
+#else
+
+static inline void coWork(CoWorkFn fn) { fn(0); fn(1); }
+
+#endif
+
+// ---------------------------------------------------------------------------
 // Panel
 // ---------------------------------------------------------------------------
 // The device build's LGFX class comes from the board header above. The SDL
