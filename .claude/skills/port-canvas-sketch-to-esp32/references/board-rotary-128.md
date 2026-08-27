@@ -1,9 +1,10 @@
 # Board reference: ELECROW CrowPanel 1.28" HMI Rotary Display (DHE38128D)
 
-The round knob board: 240×240 IPS in a rotating encoder bezel. **Researched,
-config written, not yet hardware-verified** — the live config is
-`src/shared/boards/rotary_128.h`, tag `rk`. This file is the underlying
-research, kept so facts trace to sources.
+The round knob board: 240×240 IPS in a rotating encoder bezel. **Brought up
+and hardware-verified** (`zhi_rk` flashed Aug 2026, first boot clean — panel
+lit, knob direction correct, one turn = one loop, tap reseeds) — the live
+config is `src/shared/boards/rotary_128.h`, tag `rk`. This file is the
+underlying research, kept so facts trace to sources.
 
 Sources, in order of authority:
 
@@ -123,10 +124,9 @@ custom `elecrow_s3` scheme).
 
 1. ~~Board header + envs~~ — done (`rotary_128.h`, `[native_rk]`/`[shot_rk]`/
    `[esp32_rk]`).
-2. First flash: `zhi_rk`. Things it will settle: the GPIO1/2 power enables,
-   panel geometry/rotation (which way is "up" relative to USB), touch
-   probe-after-reset, encoder direction (clockwise should advance the wave
-   away from the top-left; if it fights the knob, swap PIN_ENC_A/B or negate
-   the count), and the 60-vs-120 counts-per-rev tie-break above.
-3. Unverified beyond that: BOOT's GPIO, what GPIO1/2 gate, UART connector
-   pins, backlight drive circuit.
+2. ~~First flash~~ — done (`zhi_rk`, Aug 2026, first boot clean). Settled:
+   the GPIO1/2 power enables work, panel geometry correct at rotation 0,
+   touch probes after the GPIO13 reset pulse, encoder direction matches the
+   knob, and **60 counts/rev confirmed** — one physical turn is one loop.
+3. Still unverified: BOOT's GPIO, what GPIO1/2 actually gate, UART connector
+   pins, backlight drive circuit, which way "up" faces relative to USB.

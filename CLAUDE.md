@@ -64,12 +64,12 @@ The Touch-LCD-2 specifics, verified on hardware (`switcher_t2` flashed; geometry
 - `FB_IN_PSRAM = true`: the 150KB frame plus the switcher's statics won't reliably fit internal SRAM, and the a18 proved PSRAM placement renders fine. `esp32_t2` sets `qio_opi` for the same reason `esp32_a18` does.
 - SPI runs at the repo's proven 40MHz (~31ms full-frame push, ~32fps ceiling). Waveshare's demos ship 80MHz on these same GPIO-matrix pins (~15ms), so that headroom is real if a sketch needs it — just unexercised here.
 
-The CrowPanel 1.28" Rotary (rk) specifics, **researched but not yet hardware-verified** (all three `zhi_rk` targets build; full research with sources: `.claude/skills/port-canvas-sketch-to-esp32/references/board-rotary-128.md`):
+The CrowPanel 1.28" Rotary (rk) specifics, verified on hardware (`zhi_rk` flashed Aug 2026, first boot clean: panel, knob direction, one-turn-one-loop, and tap all confirmed; full research with sources: `.claude/skills/port-canvas-sketch-to-esp32/references/board-rotary-128.md`):
 
 - Pins in `boards/rotary_128.h`, lifted from ELECROW's own demo — which uses LovyanGFX itself, so the GC9A01 config is verbatim, not translated. Zero panel offset; the visible area is the circle inscribed in the 240x240 GRAM, corners crop under the bezel.
 - **GPIO1 and GPIO2 must be driven HIGH before the panel works** — undocumented enables the vendor demo sets first thing; `boardPowerBegin()` replicates them additively. A black panel here: check these before the panel driver.
 - **The CST816D's reset is a real GPIO (13)**, unlike the a18/t2 flexes which reset themselves — `boardPowerBegin()` pulses it and waits ~60ms so the boot probe doesn't mistake a chip still in reset for the usual CST816 auto-sleep. Touch I2C is SDA=6/SCL=7 (carried as `PIN_IMU_*`; there is no IMU on this board).
-- **The encoder ring is 30 detents, 15 quadrature cycles per revolution → `ENC_COUNTS_PER_REV = 60`** (EC3501 C15H30P3 datasheet; its own series table contradicts this — the model code broke the tie). If one physical turn ever sweeps two loops of a sketch, that tie-break was wrong: make it 120. `encoder.h` decodes 4x with IRAM interrupts on A=45/B=42; the knob's full-press is GPIO41 (`PIN_KNOB_BTN`, active low), deliberately not `PIN_BOOT`.
+- **The encoder ring is 30 detents, 15 quadrature cycles per revolution → `ENC_COUNTS_PER_REV = 60`** (EC3501 C15H30P3 datasheet; its own series table said 120 — the model code broke the tie, and hardware confirmed 60: one physical turn is one loop of zhi's breath). `encoder.h` decodes 4x with IRAM interrupts on A=45/B=42; the knob's full-press is GPIO41 (`PIN_KNOB_BTN`, active low), deliberately not `PIN_BOOT`.
 - 115KB framebuffer, so `FB_IN_PSRAM = false` — the 1.47B's situation, not the t2's. Vendor demo proves PSRAM framebuffers + 80MHz SPI also work if a roster ever needs the internal SRAM back; the header ships the repo's proven 40MHz (~23ms/frame).
 
 ## The two buttons
