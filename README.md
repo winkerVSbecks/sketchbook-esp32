@@ -31,31 +31,32 @@ Three ideas carry the whole repo:
 
 3. **The desktop is the test loop.** Every sketch also builds as a native SDL2
    window (iterate in seconds, not flash cycles) and as a headless binary that
-   writes PNG frames to disk — which is how a port gets *checked*, not just
+   writes PNG frames to disk — which is how a port gets _checked_, not just
    eyeballed.
 
 ## The sketches
 
-| Sketch | Motion |
-|---|---|
-| `main.cpp` — arc tiles | still |
-| `arc_tiles_shake.cpp` | still; shaking the board redraws it |
-| `collapse.cpp` | animated, 6s loop |
-| `trochoidal_wave.cpp` | animated, 4s loop |
-| `terminal_charts.cpp` | animated, 8s scroll loop |
-| `skeleton_line.cpp` | animated, 8s loop |
-| `jali_truchet.cpp` | still; tilt slides the lattice, shake redraws |
-| `switcher.cpp` | hosts the roster in one binary; BOOT cycles |
+| Sketch                 | Motion                                        |
+| ---------------------- | --------------------------------------------- |
+| `main.cpp` — arc tiles | still                                         |
+| `arc_tiles_shake.cpp`  | still; shaking the board redraws it           |
+| `collapse.cpp`         | animated, 6s loop                             |
+| `trochoidal_wave.cpp`  | animated, 4s loop                             |
+| `terminal_charts.cpp`  | animated, 8s scroll loop                      |
+| `skeleton_line.cpp`    | animated, 8s loop                             |
+| `jali_truchet.cpp`     | still; tilt slides the lattice, shake redraws |
+| `switcher.cpp`         | hosts the roster in one binary; BOOT cycles   |
 
 ## The boards
 
-| Tag | Board | Panel |
-|---|---|---|
-| `147` | Waveshare ESP32-S3-LCD-1.47B | 172×320 ST7789 IPS, SPI |
-| `a18` | Waveshare ESP32-S3-Touch-AMOLED-1.8 (V1) | 368×448 SH8601 AMOLED, QSPI, FT3168 touch |
-| `t2` | Waveshare ESP32-S3-Touch-LCD-2 | 240×320 ST7789T3 IPS, SPI, CST816D touch |
+| Tag   | Board                                    | Panel                                                                |
+| ----- | ---------------------------------------- | -------------------------------------------------------------------- |
+| `147` | Waveshare ESP32-S3-LCD-1.47B             | 172×320 ST7789 IPS, SPI                                              |
+| `a18` | Waveshare ESP32-S3-Touch-AMOLED-1.8 (V1) | 368×448 SH8601 AMOLED, QSPI, FT3168 touch                            |
+| `t2`  | Waveshare ESP32-S3-Touch-LCD-2           | 240×320 ST7789T3 IPS, SPI, CST816D touch                             |
+| `rk`  | ELECROW CrowPanel 1.28" HMI Rotary       | 240×240 round GC9A01 IPS, SPI, CST816D touch, 30-detent encoder ring |
 
-All three are ESP32-S3R8 (dual-core LX7, 8MB octal PSRAM, 16MB flash).
+All four are ESP32-S3R8 (dual-core LX7, 8MB octal PSRAM, 16MB flash).
 
 ## Running things
 
