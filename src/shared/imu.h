@@ -10,6 +10,10 @@
 //   imuBegin()          probe and configure; false means no shake gesture at
 //                       all, so RESET is the only way to a new composition
 //   shakeDetected(g)    true on a peak above `g` total acceleration
+//   imuShakeDetected(g) the same, minus the SDL click stand-in — for sketches
+//                       built on touchPoint(), whose clicks are already the
+//                       finger. No desktop stand-in at all (the tapDetected()
+//                       precedent): on SDL, relaunch the binary instead
 //   imuTilt(gx, gy)     the gravity vector's screen-plane components, in g
 // ============================================================================
 #pragma once
@@ -112,6 +116,9 @@ static bool shakeDetected(float shakeG) {
   return true;
 }
 
+// On device the click stand-in doesn't exist, so this IS shakeDetected.
+static inline bool imuShakeDetected(float shakeG) { return shakeDetected(shakeG); }
+
 // gx > 0 when the panel's right edge dips, gy > 0 when its bottom (USB) edge
 // dips; both ~0 lying face-up, gy ~1 standing upright. The mapping below takes
 // the QMI8658's X/Y axes straight — it has not been sighted on hardware yet,
@@ -151,6 +158,10 @@ static bool shakeDetected(float) {
   return fired;
 #endif
 }
+
+// No stand-in, deliberately: a touchPoint() sketch's clicks are its finger,
+// so the click-as-shake above would fire on every stroke.
+static inline bool imuShakeDetected(float) { return false; }
 
 // Drag stands in for tilt: hold the mouse and pull away from the window
 // centre; released, the tilt eases back to level. Headless has no window, so

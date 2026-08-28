@@ -1,10 +1,11 @@
 // ============================================================================
-// switcher_kids.cpp — the two touch toys in one binary, BOOT swaps between them
+// switcher_kids.cpp — the touch toys in one binary, BOOT swaps between them
 // ============================================================================
-// A roster for small hands: paint (drag draws, tap changes the crayon) and zhi
-// (finger scrubs the breathing checkerboards, tap deals a new one). Both
-// sketches live entirely on the glass, which forces the one design difference
-// from switcher.cpp:
+// A roster for small hands: paint (drag draws, tap changes the crayon, shake
+// wipes), zhi (finger scrubs the breathing checkerboards, tap deals a new
+// one), and the core (tap pops the cube stack open, holding squishes it,
+// release wobbles it out like jelly). All of them live entirely on the
+// glass, which forces the one design difference from switcher.cpp:
 //
 //   BOOT (GPIO0)   swap to the other sketch. On SDL, click the bottom strip.
 //   RESET          reboot into the *same* sketch, fresh composition.
@@ -32,6 +33,11 @@
 //
 //   pio run -e kids_t2_native -t exec    # SDL; drag/click = finger, bottom strip = BOOT
 //   pio run -e kids_t2 -t upload         # board; BOOT swaps, RESET reseeds
+//
+// Also runs on the AMOLED-1.8 (kids_a18*), which has no RESET button — and
+// the tap that stands in for it elsewhere belongs to the sketches here. The
+// fresh-composition gesture on that board is BOOT twice: swap away and back,
+// and the re-entered setup() draws from a new seed.
 // ============================================================================
 #define SKETCH_TITLE  "kids"
 #define SKETCH_FRAMES 4
@@ -44,6 +50,7 @@
 #include "shared/color.h"
 #include "shared/palettes.h"
 #include "shared/touch.h"
+#include "shared/imu.h"
 
 // Step 2 — the sketches, each in a namespace. SKETCH_TITLE/SKETCH_FRAMES are
 // #undef'd first because both define them for platform.h, which has already
@@ -60,6 +67,12 @@ namespace sk_zhi {
 #include "zhi.cpp"
 }
 
+#undef SKETCH_TITLE
+#undef SKETCH_FRAMES
+namespace sk_core {
+#include "the_core.cpp"
+}
+
 // ---------------------------------------------------------------------------
 // The roster
 // ---------------------------------------------------------------------------
@@ -72,6 +85,7 @@ struct Sketch {
 static const Sketch SKETCHES[] = {
   { "paint", sk_paint::setup, sk_paint::loop },
   { "zhi",   sk_zhi::setup,   sk_zhi::loop   },
+  { "core",  sk_core::setup,  sk_core::loop  },
 };
 static const int N_SKETCHES = (int)(sizeof(SKETCHES) / sizeof(SKETCHES[0]));
 

@@ -14,8 +14,10 @@
 // point so a fast flick doesn't leave a gap.
 //
 // RESET reboots into a fresh palette and a blank canvas, for free — setup()
-// always draws bg + swatch from a new seed. There is no other way to clear
-// the canvas here; that's deliberate, this board has both buttons.
+// always draws bg + swatch from a new seed. Shaking the board wipes the
+// drawing Etch A Sketch style, keeping the palette and the current crayon —
+// device only: on SDL the clicks are the finger, so shake has no stand-in
+// there (relaunch instead), and headless never fires it.
 // ============================================================================
 
 #define SKETCH_TITLE  "paint"
@@ -26,6 +28,7 @@
 #include "shared/color.h"
 #include "shared/palettes.h"
 #include "shared/touch.h"
+#include "shared/imu.h"
 
 // ---------------------------------------------------------------------------
 // Config
@@ -37,6 +40,11 @@ static const float BRUSH_STEP   = BRUSH_RADIUS * 0.5f;   // interpolation spacin
 // TAP_MAX_MOVE from where it started, is a tap; anything else is a drag.
 static const uint32_t TAP_MAX_MS   = 250;
 static const float    TAP_MAX_MOVE = 8.0f;
+
+// Shake wipes the drawing (bg + swatch repainted, palette and crayon kept).
+// Same threshold and cooldown as the shake sketches; small hands shake hard.
+static const float    SHAKE_G           = 2.9f;
+static const uint32_t SHAKE_COOLDOWN_MS = 600;
 
 // Brush colors are palette entries that read against the background — a thin
 // stroke needs less contrast than a filled area, so this sits below the
@@ -52,9 +60,11 @@ static const int   MAX_BRUSH_COLORS  = 16;
 // full painting palette is on hand.
 static const int   TARGET_BRUSH_COLORS = 12;
 
+// Inset enough to clear a rounded glass corner: at 20px the AMOLED-1.8's
+// bezel curve clips the ring. 32 sits fully inside on every board so far.
 static const int SWATCH_R  = 9;
-static const int SWATCH_CX = W - 20;
-static const int SWATCH_CY = 20;
+static const int SWATCH_CX = W - 32;
+static const int SWATCH_CY = 32;
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -226,6 +236,7 @@ void setup() {
   }
 
   if (!touchBegin()) Serial.println("no touch controller - this sketch needs one");
+  imuBegin();   // shake-to-clear; without an IMU the sketch just keeps drawing
 
   rngSeed(newSeed());
   buildPalette();
@@ -236,6 +247,14 @@ void setup() {
 }
 
 void loop() {
+  static uint32_t lastShakeAt = 0;
+  if (millis() - lastShakeAt >= SHAKE_COOLDOWN_MS && imuShakeDetected(SHAKE_G)) {
+    lastShakeAt = millis();
+    cv.fillScreen(to565(bg));
+    drawSwatch();
+    present();
+  }
+
   int tx, ty;
   const bool touched = readTouch(&tx, &ty);
   bool changed = false;
