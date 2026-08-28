@@ -3,8 +3,8 @@
 // ============================================================================
 // A roster for small hands: paint (drag draws, tap changes the crayon, shake
 // wipes), zhi (finger scrubs the breathing checkerboards, tap deals a new
-// one), and the core (tap pops the cube stack open, holding squishes it,
-// release wobbles it out like jelly). All of them live entirely on the
+// one), and the core (tap replays the cube stack's pop, holding shrinks it
+// shut, release springs it back open like jelly). All of them live entirely on the
 // glass, which forces the one design difference from switcher.cpp:
 //
 //   BOOT (GPIO0)   swap to the other sketch. On SDL, click the bottom strip.

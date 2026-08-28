@@ -27,7 +27,7 @@ One `.cpp` per sketch in `src/`, shared header-only modules in `src/shared/`. En
 | `src/switcher.cpp` | `switcher_147*`, `switcher_a18*`, `switcher_t2*` | all of the above except `main.cpp` and `jali_truchet.cpp`, in one binary; BOOT cycles |
 | `src/paint.cpp` | `paint_t2*` | still; drag paints, tap cycles the brush color, shake wipes the drawing (device only — SDL clicks are the finger, so no shake stand-in) |
 | `src/zhi.cpp` | `zhi_t2*` | still; finger's y scrubs the breathing grids, tap redraws (touch-first, so t2 only) |
-| `src/the_core.cpp` | `core_a18*` | still between gestures; six nested isometric cubes — tap plays the stagger-bounce pop once, holding squashes the stack, release wobbles it out like jelly. Deterministic — no randomness, RESET changes nothing (touch-first) |
+| `src/the_core.cpp` | `core_a18*` | still between gestures; six nested isometric cubes — tap replays the stagger-bounce pop, holding shrinks the stack diagonally shut, release springs it back open like jelly. Deterministic — no randomness, RESET changes nothing (touch-first) |
 | `src/switcher_kids.cpp` | `kids_t2*`, `kids_a18*` | paint + zhi + the core in one binary; BOOT swaps, the glass belongs to the active sketch — this switcher must not read taps (see its header). On the a18 (no RESET) the fresh-composition gesture is BOOT twice |
 | `src/zhi_knob.cpp` | `zhi_rk*` | still; turning the knob drives the playhead (one revolution = one loop of the breath), tap redraws (knob-first, so rk only). SDL: drag = knob |
 | `src/isolines.cpp` | `iso_rk*` | still; knob drives the playhead through a noise-field contour loop (one revolution = one loop, wrap seamless), tap redraws (knob-first, so rk only). SDL: drag = knob |
