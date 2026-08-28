@@ -3,9 +3,11 @@
 // ============================================================================
 // A roster for small hands: paint (drag draws, tap changes the crayon, shake
 // wipes), zhi (finger scrubs the breathing checkerboards, tap deals a new
-// one), and the core (tap replays the cube stack's pop, holding shrinks it
-// shut, release springs it back open like jelly). All of them live entirely on the
-// glass, which forces the one design difference from switcher.cpp:
+// one), the core (tap replays the cube stack's pop, holding shrinks it shut,
+// release springs it back open like jelly), and napoleon (drag the purple
+// handles to move the triangle's vertices, tap empty glass to reset the
+// layout). All of them live entirely on the glass, which forces the one
+// design difference from switcher.cpp:
 //
 //   BOOT (GPIO0)   swap to the other sketch. On SDL, click the bottom strip.
 //   RESET          reboot into the *same* sketch, fresh composition.
@@ -28,8 +30,8 @@
 //
 // Hosting works exactly as switcher.cpp documents: shared headers included at
 // global scope first (the union of what the two sketches use), then each
-// sketch's .cpp inside its own namespace. Both are unmodified and still build
-// standalone from their own envs.
+// sketch's .cpp inside its own namespace. All four are unmodified and still
+// build standalone from their own envs.
 //
 //   pio run -e kids_t2_native -t exec    # SDL; drag/click = finger, bottom strip = BOOT
 //   pio run -e kids_t2 -t upload         # board; BOOT swaps, RESET reseeds
@@ -42,8 +44,8 @@
 #define SKETCH_TITLE  "kids"
 #define SKETCH_FRAMES 4
 
-// Step 1 — shared modules at global scope: the union of the two sketches'
-// includes, so their own re-includes are no-ops and both bind to one lcd, one
+// Step 1 — shared modules at global scope: the union of the sketches'
+// includes, so their own re-includes are no-ops and all bind to one lcd, one
 // cv, one framebuffer.
 #include "shared/platform.h"
 #include "shared/prng.h"
@@ -73,6 +75,12 @@ namespace sk_core {
 #include "the_core.cpp"
 }
 
+#undef SKETCH_TITLE
+#undef SKETCH_FRAMES
+namespace sk_nap {
+#include "napoleon.cpp"
+}
+
 // ---------------------------------------------------------------------------
 // The roster
 // ---------------------------------------------------------------------------
@@ -83,9 +91,10 @@ struct Sketch {
 };
 
 static const Sketch SKETCHES[] = {
-  { "paint", sk_paint::setup, sk_paint::loop },
-  { "zhi",   sk_zhi::setup,   sk_zhi::loop   },
-  { "core",  sk_core::setup,  sk_core::loop  },
+  { "paint",    sk_paint::setup, sk_paint::loop },
+  { "zhi",      sk_zhi::setup,   sk_zhi::loop   },
+  { "core",     sk_core::setup,  sk_core::loop  },
+  { "napoleon", sk_nap::setup,   sk_nap::loop   },
 };
 static const int N_SKETCHES = (int)(sizeof(SKETCHES) / sizeof(SKETCHES[0]));
 
