@@ -42,11 +42,18 @@ static const int PIN_BOOT = 0;
 static const int PIN_IMU_SDA = 15;
 static const int PIN_IMU_SCL = 14;
 
-// FT3168 capacitive touch, for touch.h. Tap stands in for the RESET button
-// this board doesn't have: tap the glass, get a new composition. The FT3168
-// acks I2C whether or not a finger is down, unlike the CST816 family.
-static const int  TOUCH_I2C_ADDR        = 0x38;
-static const bool TOUCH_NACKS_WHEN_IDLE = false;
+// Capacitive touch, for touch.h. Tap stands in for the RESET button this
+// board doesn't have: tap the glass, get a new composition.
+//
+// The unit in hand is now a V2 (the replacement bought 2026-08: its touch
+// NACKed at the FT3168's 0x38 while the same bus served the AXP2101, and the
+// panel renders on the SH8601 init — so the CO5300 accepts it). The V2's
+// CST820 sits at 0x15 and is CST816-family: it auto-sleeps and NACKs while
+// untouched, exactly like the t2's CST816D, hence NACKS_WHEN_IDLE. For a V1
+// unit (FT3168): 0x38, false — the FT3168 acks whether or not a finger is
+// down.
+static const int  TOUCH_I2C_ADDR        = 0x15;
+static const bool TOUCH_NACKS_WHEN_IDLE = true;
 
 #if defined(ARDUINO)
 

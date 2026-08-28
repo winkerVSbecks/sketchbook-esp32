@@ -52,7 +52,7 @@ Three ideas carry the whole repo:
 | Tag   | Board                                    | Panel                                                                |
 | ----- | ---------------------------------------- | -------------------------------------------------------------------- |
 | `147` | Waveshare ESP32-S3-LCD-1.47B             | 172×320 ST7789 IPS, SPI                                              |
-| `a18` | Waveshare ESP32-S3-Touch-AMOLED-1.8 (V1) | 368×448 SH8601 AMOLED, QSPI, FT3168 touch                            |
+| `a18` | Waveshare ESP32-S3-Touch-AMOLED-1.8 (V2) | 368×448 AMOLED, QSPI, CST820 touch                                   |
 | `t2`  | Waveshare ESP32-S3-Touch-LCD-2           | 240×320 ST7789T3 IPS, SPI, CST816D touch                             |
 | `rk`  | ELECROW CrowPanel 1.28" HMI Rotary       | 240×240 round GC9A01 IPS, SPI, CST816D touch, 30-detent encoder ring |
 
